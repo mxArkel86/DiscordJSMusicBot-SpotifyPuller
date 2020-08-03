@@ -3,6 +3,10 @@ const http = require('http');
 const { prefix, token } = require("./config.json");
 const ytdl = require("ytdl-core");
 const { Console } = require("console");
+const { filterFormats } = require("ytdl-core");
+const { formatWithOptions } = require("util");
+const { format } = require("path");
+const { exit } = require("process");
 
 const client = new Discord.Client();
 
@@ -40,15 +44,17 @@ client.on("message", async message => {
 
   const prefab = guildData.get(message.guild.id);
   prefab.voiceChannel = voiceChannel;
-  prefab.textChannel = message.textChannel;
+  prefab.textChannel = message.channel;
 
   if(message.content==`${prefix}link`){
-    prefab.userID = message.author.id;
-    prefab.song = null;
+    
 
     try {
+      prefab.userID = message.author.id;
+      prefab.song = null;
       var connection = await voiceChannel.join();
       prefab.connection = connection;
+      prefab.textChannel.send("User *" + message.author.username + "* linked");
       return;
     } catch (err) {
       console.log(err);
@@ -57,6 +63,10 @@ client.on("message", async message => {
     }
   } else if (message.content.startsWith(`${prefix}stop`)) {
     stop(message, prefab);
+    return;
+  } else if (message.content.startsWith(`${prefix}query `)) {
+    prefab.query = message.content.substr(`${prefix}query`.length + 1)
+    message.channel.send("set query");
     return;
   } else {
     message.channel.send("You need to enter a valid command!");
@@ -89,13 +99,16 @@ client.on("voiceStateUpdate", async (oldMember, newMember)=>{
 });
 
 client.on("presenceUpdate", async message => {
-  if(!guildData.get(message.guild.id))return;
+  if(message===undefined)
+  return;
+  if(!guildData.get(message.guild.id))
+  return;
   prefab = guildData.get(message.guild.id);
   var userid = message.userID;
   if(prefab.userID != userid)
   return;
-  prefab.textChannel.send("Presence updated");
-  var activities = user.presence.activities;
+  
+  var activities = message.user.presence.activities;
 
   var found = false;
   var activity = null;
@@ -110,13 +123,15 @@ client.on("presenceUpdate", async message => {
   }
   if(!found)
   return "Spotify is not the current status";
-  
-  console.log(activity);
 
   var songname = activity.details;
   var artist = activity.state;
+  if(prefab.song!==null && songname==prefab.song.title)
+    return;
+  console.log("Presence updated");
   guildData.set(prefab.guildID, prefab);
-  http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + songname + " by " + artist +"&page=1", function(res) {
+  var d = Date.now();
+  http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + prefab.query.replace("$title", songname).replace("$artist", artist) +"&page=1", function(res) {
     let data = '',
       json_data;
   
@@ -127,14 +142,20 @@ client.on("presenceUpdate", async message => {
       prefab = guildData.get(message.guild.id);
       json_data = JSON.parse(data);
       var video = json_data.results[0].video;
+      var duration = video.duration;
+      var sec = parseInt(duration.split(':')[0])*60 + parseInt(duration.split(':')[1]) ;
       const song = {
         title: songname,
         artist: artist,
         url: video.url,
+        length: sec*1000
       };
+      console.log(sec);
       prefab.song = song;
+      prefab.delay = Date.now()-d;
       guildData.set(prefab.guildID, prefab);
-      play(prefab);
+      console.log("waiting " + prefab.delay + " ms");
+      setTimeout(play, 0, prefab)
     });
   });
   return "0";
@@ -143,7 +164,7 @@ client.on("presenceUpdate", async message => {
 async function stop(prefab, channel) {
   prefab.song = null;
   if(prefab.connection.dispatcher!==null)
-  prefab.connection.dispatcher.end();
+  prefab.connection.disconnect();
 }
 
 function checkData(guild){
@@ -156,7 +177,10 @@ function checkData(guild){
       connection: null,
       song: null,
       volume: 5,
-      userID: null
+      userID: null,
+      playing: false,
+      delay: 0,
+      query:"$title $artist"
     };
     guildData.set(guild.id, guildPrefab);
   }
@@ -168,13 +192,39 @@ async function play(prefab) {
     prefab.voiceChannel.leave();
     return;
   }
+  
+  var start = Date.now();
+  var first = true;
 
-  const dispatcher = prefab.connection
-    .play(ytdl(song.url))
-    .on("finish", () => {
-      //play(prefab);
+  let dispatcher = prefab.connection
+    .play(ytdl(song.url, {
+      filter: 'audioonly',
+      format: 'lowestvideo',
+    }))
+    .on("speaking", ()=>{
+      
+      if(first){
+        first =false;
+      prefab = guildData.get(prefab.guildID);
+      console.log("first run");
+      prefab.delay += Date.now()-start;
+      start = Date.now();
+      prefab.playing = true;
+      console.log("delay=" +prefab.delay);
+      prefab.song.length-=prefab.delay;
+      guildData.set(prefab.guildID, prefab);
+      }
     })
-    .on("error", error => console.error(error));
+    .on("finish", () => {
+      prefab = guildData.get(prefab.guildID);
+      console.log("natural stop");
+      prefab.playing = false;
+      guildData.set(prefab.guildID, prefab);
+    })
+    .on("error",  ()=>{
+    });
+   
+  dispatcher.setVolumeLogarithmic();
   dispatcher.setVolumeLogarithmic(prefab.volume / 5);
   prefab.textChannel.send(`Start playing: **${song.title}**`);
 }
