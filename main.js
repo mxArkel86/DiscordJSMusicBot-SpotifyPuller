@@ -1,7 +1,7 @@
 //#region Imports
 const Discord = require("discord.js");
 const http = require('http');
-var path = require('path'); 
+const fs = require('fs')
 var streamBuffers = require('stream-buffers');
 const ytdl = require("ytdl-core");
 const { Console } = require("console");
@@ -11,11 +11,23 @@ const { format } = require("path");
 const { exit } = require("process");
 ////#endregion
 
+var _prefix='!';
+var _token=null;
 //load config file
-if(path.existsSync('./configOverride.json'))
-const { prefix, token } = require("./configOverride.json");
-else
-const { prefix, token } = require("./config.json");
+var f_ = -1;
+if(fs.existsSync('./configOverride.json')){
+var { prefix, token } = require("./configOverride.json");
+_prefix = prefix;
+_token = token;
+f_ = 1;
+}
+else{
+var { prefix, token } = require("./config.json");
+_prefix = prefix;
+_token = token;
+f_ = 0;
+}
+console.log("loaded config {" + f_ + "}");
 
 //static objects
 const client = new Discord.Client();
@@ -68,7 +80,7 @@ client.on("message", async message => {
   prefab.textChannel = message.channel;
 
 
-  if(message.content==`${prefix}link`){
+  if(message.content==`${_prefix}link`){
     try {
       //link to user and clear song queue
       prefab.userID = message.author.id;
@@ -77,19 +89,19 @@ client.on("message", async message => {
       var connection = await voiceChannel.join();
       prefab.connection = connection;
 
-      prefab.textChannel.send("User *" + message.author.username + "* linked");
+      prefab.textChannel.send("User **" + message.author.username + "** linked");
       return;
     } catch (err) {
       console.log(err);
       guildData.delete(guildID);
       return;
     }
-  } else if (message.content.startsWith(`${prefix}stop`)) {
+  } else if (message.content.startsWith(`${_prefix}stop`)) {
     stop(prefab);//stop voice interaction
     dSet(guildID, prefab);
     return;
-  } else if (message.content.startsWith(`${prefix}query `)) {
-    prefab.query = message.content.substr(`${prefix}query`.length + 1)//change query to find youtube video
+  } else if (message.content.startsWith(`${_prefix}query `)) {
+    prefab.query = message.content.substr(`${_prefix}query`.length + 1)//change query to find youtube video
     dSet(guildID, prefab);
     message.channel.send("updated query");
     return;
@@ -291,4 +303,4 @@ async function process(guildID, song) {
   
 }
 
-client.login(token);
+client.login(_token);
