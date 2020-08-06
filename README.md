@@ -13,10 +13,33 @@ The bot is made to expect some lag between a song being switched to by the spoti
 
 *Please report bug fixes in order to improve the experience of others. Credit is not needed though copying source code to claim as their own in a duplicate repository is prohibited.*
 
-**Config File** *(please use the included config file which is without comments)*<br>
-*<config.json>*<br>
-__{__<br>
-__"prefix": "",__  #the prefix that is expected before a command is typed  (ex. !, -, +, *)<br>
-__"token": "",__ #the token of the discord bot. To set one up, go to  [https://discord.com/developers/applications](https://discord.com/developers/applications "https://discord.com/developers/applications")<br>
-__"max_backup_searches":__ 2 #the maximum amount of backup searches to have without including the first one. A lower value is faster but may allow for errors to appear in some circumstances <br>
-__}__
+**Config File** *<config.json>* *(please use the included config file which is without comments)* <br>
+
+__{__ <br>
+    "token":"", <br>
+    "formats": <br>
+    [ <br>
+      __{__ <br>
+            "prefix":"!", <br>
+            "max_backup_searches": 2, <br>
+            "volume": 2, <br>
+            "query": "$title" <br>
+      __},__ <br>
+      __{__ <br>
+            "prefix":"-", <br>
+            "max_backup_searches": 5, <br>
+            "volume": 5, <br>
+            "query": "$title by $artist" <br>
+      __}__ <br>
+    ], <br>
+    "servers": [ <br>
+      __{__ <br>
+            "id":"654776754", <br>
+            "format":0 <br>
+      __},__ <br>
+      __{__ <br>
+            "id":"56567845464323", <br>
+            "format":1 <br>
+      __} <br>
+    ] <br>
+__}__ <br>
