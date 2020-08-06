@@ -333,7 +333,8 @@ function downloadData(guildID, matchsongs, index, inp) {
       param.songs.push(song);
 
       var delay_old = param.delay;
-      param.delay = song.delay;
+      if(song.delay>param.delay)
+        param.delay = song.delay;
       if (param.playing)
         delay_old = 0;
 
