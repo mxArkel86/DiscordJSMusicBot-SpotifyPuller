@@ -1,4 +1,5 @@
 {
 "prefix": "",
-"token": ""
+"token": "",
+"max_backup_searches": 2
 }

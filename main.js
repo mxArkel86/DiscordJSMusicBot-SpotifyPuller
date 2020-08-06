@@ -16,18 +16,21 @@ const { setTimeout } = require("timers");
 
 var _prefix = '!';
 var _token = null;
+var _maxbackupsearches;
 //load config file
 var f_ = -1;
 if (fs.existsSync('./configOverride.json')) {
-  var { prefix, token } = require("./configOverride.json");
+  var { prefix, token, max_backup_searches } = require("./configOverride.json");
   _prefix = prefix;
   _token = token;
+  _maxbackupsearches = parseInt(max_backup_searches);
   f_ = 1;
 }
 else {
-  var { prefix, token } = require("./config.json");
+  var { prefix, token, max_backup_searches } = require("./config.json");
   _prefix = prefix;
   _token = token;
+  _maxbackupsearches = parseInt(max_backup_searches);
   f_ = 0;
 }
 console.log("loaded config {" + f_ + "}");
@@ -209,7 +212,6 @@ function processVideoList(guildID, data, inp) {
 
   for (var i = 0; i < json_data.results.length; i++) {
     console.log("checking video [" + i + "]");
-
     let video = json_data.results[i].video;
     var duration = 0;
     if (video != undefined) {
@@ -226,8 +228,11 @@ function processVideoList(guildID, data, inp) {
       };
       if(song.match)
       songlist.push(song);
+      if(songlist.length>max_backup_searches-1)
+        break;
     }
   }
+  console.log(songlist.length + " matches   backupsearches=[" + _maxbackupsearches + "]");
   downloadData(guildID, songlist, 0, [startDelay, songoffset]);
 }
 
@@ -265,7 +270,6 @@ function dSet(guildID, guildPrefab) {
 async function playStream(guildID) {
   prefab = dPull(guildID);
   var song = prefab.songs.shift();
-  console.log('begin');
   var d = Date.now();
   var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
     frequency: 10,      // in milliseconds.
@@ -300,7 +304,6 @@ async function playStream(guildID) {
 
   dispatcher.setVolumeLogarithmic();
   dispatcher.setVolumeLogarithmic(prefab.volume / 5);
-  console.log('end');
 }
 
 function downloadData(guildID, matchsongs, index, inp) {
