@@ -13,10 +13,35 @@ The bot is made to expect some lag between a song being switched to by the spoti
 
 *Please report bug fixes in order to improve the experience of others. Credit is not needed though copying source code to claim as their own in a duplicate repository is prohibited.*
 
-**Config File** *(please use the included config file which is without comments)*<br>
-*<config.json>*<br>
-__{__<br>
-__"prefix": "",__  #the prefix that is expected before a command is typed  (ex. !, -, +, *)<br>
-__"token": "",__ #the token of the discord bot. To set one up, go to  [https://discord.com/developers/applications](https://discord.com/developers/applications "https://discord.com/developers/applications")<br>
-__"max_backup_searches":__ 2 #the maximum amount of backup searches to have without including the first one. A lower value is faster but may allow for errors to appear in some circumstances <br>
-__}__
+**Config File** *(please use the included config file which is without comments)* <br>
+*<config.json>* <br>
+<pre>
+{  <br>
+    "token":"",  #the token of the discord bot <br>
+    "formats": #the different formats that the servers might have decided to go for <br> 
+    [  <br>
+        {  <br>
+            "prefix":"!", #the prefix for all commands being sent through <br>
+            "max_backup_searches": 2, #the maximum amount of backup searches in case a search element breaks <br>
+            "volume": 2, #the overall volume of the discord bot <br>
+            "query": "$title" #the query string used to search for music <br>
+        },  <br>
+        {  <br>
+            "prefix":"-",  <br>
+            "max_backup_searches": 5,  <br>
+            "volume": 5,  <br>
+            "query": "$title by $artist"  <br>
+        }  <br>
+    ],  <br>
+    "servers": [ #the different servers used by the bot <br> 
+        {  <br>
+            "id":"654776754", #the id of the server <br>
+            "format":0 #the format the server adopted <br>
+        },  <br>
+        {  <br>
+            "id":"56567845464323",  <br>
+            "format":1  <br>
+        }  <br>
+    ]  <br>
+}  <br>
+</pre>
