@@ -315,8 +315,7 @@ async function playStream(guildID) {
       console.log(e);
     });
 
-  dispatcher.setVolumeLogarithmic();
-  dispatcher.setVolumeLogarithmic(settings.volume);
+  dispatcher.setVolume(settings.volume);
 }
 
 function downloadData(guildID, matchsongs, index, inp) {
