@@ -13,31 +13,47 @@ const stream = require('stream');
 const { addFormatMeta } = require("ytdl-core/lib/util");
 const { setTimeout } = require("timers");
 ////#endregion
+const serverData = new Map();
 
-var _prefix = '!';
-var _token = null;
-var _maxbackupsearches;
-//load config file
-var f_ = -1;
+var token;
+
+function importSettings(file){
+  fs.readFile(file, 'utf8', (err, data)=>{
+    var tree = JSON.parse(data);
+
+    token = tree.token;
+    
+    for(var guild of tree.servers){
+      let guildSettings = tree.formats[guild.format];
+      const guildData = {
+        textChannel: null,
+        voiceChannel: null,
+        connection: null,
+        songs: [],
+        userID: null,
+        playing: false,
+        delay: 0
+      };
+      serverData[guild.id] = [guildData, guildSettings];
+    }
+    init();
+  });
+ 
+  
+  
+  //dSet(guildID, guildPrefab);
+}
 if (fs.existsSync('./configOverride.json')) {
-  var { prefix, token, max_backup_searches } = require("./configOverride.json");
-  _prefix = prefix;
-  _token = token;
-  _maxbackupsearches = parseInt(max_backup_searches);
-  f_ = 1;
+  importSettings("./configOverride.json");
 }
 else {
-  var { prefix, token, max_backup_searches } = require("./config.json");
-  _prefix = prefix;
-  _token = token;
-  _maxbackupsearches = parseInt(max_backup_searches);
-  f_ = 0;
+  importSettings("./config.json");
 }
-console.log("loaded config {" + f_ + "}");
+console.log("loaded config");
 
 //static objects
 const client = new Discord.Client();
-const guildData = new Map();
+
 
 //#region EventHandlers
 client.once("ready", () => {
@@ -54,12 +70,17 @@ client.once("disconnect", () => {
 });
 
 //#endregion
-
+function init(){
+client.login(token);
+}
 //on message recieved
 client.on("message", async message => {
   //checking if server data does exist
   const guildID = message.guild.id;
-  checkData(guildID);
+  let sData = serverData[guildID];
+  let settings = sData[1];
+  let data = sData[0];
+  var prefix = settings.prefix;
   //if message is not from a bot
   if (message.author.bot) return;
   //if message is truly a command
@@ -79,36 +100,33 @@ client.on("message", async message => {
     );
   }
 
-  //pull data
-  var prefab = dPull(guildID);
-  //set initial parameters
-  prefab.voiceChannel = voiceChannel;
-  prefab.textChannel = message.channel;
+  
+  data.voiceChannel = voiceChannel;
+  data.textChannel = message.channel;
 
 
-  if (message.content == `${_prefix}link`) {
+  if (message.content == `${prefix}link`) {
     try {
       //link to user and clear song queue
-      prefab.userID = message.author.id;
-      prefab.songs = [];
+      data.userID = message.author.id;
+      data.songs = [];
       //initialize connection
       var connection = await voiceChannel.join();
-      prefab.connection = connection;
+      data.connection = connection;
 
-      prefab.textChannel.send("User **" + message.author.username + "** linked");
+      data.textChannel.send("User **" + message.author.username + "** linked");
       return;
     } catch (err) {
       console.log(err);
-      guildData.delete(guildID);
+      serverData.delete(guildID);
       return;
     }
-  } else if (message.content.startsWith(`${_prefix}stop`)) {
-    stop(prefab);//stop voice interaction
-    dSet(guildID, prefab);
+  } else if (message.content.startsWith(`${prefix}stop`)) {
+    stop(data);//stop voice interaction
     return;
-  } else if (message.content.startsWith(`${_prefix}query `)) {
-    prefab.query = message.content.substr(`${_prefix}query`.length + 1)//change query to find youtube video
-    dSet(guildID, prefab);
+  } else if (message.content.startsWith(`${prefix}query `)) {
+    settings.query = message.content.substr(`${prefix}query`.length + 1)//change query to find youtube video
+    
     message.channel.send("updated query");
     return;
   } else {
@@ -121,7 +139,8 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
   let newUserChannel = newMember.channel;
 
   const guildID = oldMember.guild.id;
-  var prefab = dPull(guildID);
+  let sData = serverData[guildID];
+  let data = sData[0];
 
   var userid = newMember.member.id;
   var type = 0;
@@ -131,35 +150,32 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
     type = 1;
 
 
-  if (userid == prefab.userID) {
+  if (userid == data.userID) {
     if (type == -1) {//user left the channel
-      stop(prefab);//stop voice interaction
-      prefab.userID = null;//disconnect user link
+      stop(data);//stop voice interaction
+      data.userID = null;//disconnect user link
 
       //if users in channel is 1 or 0
       if (oldUserChannel.members.size < 2)
         oldUserChannel.leave();
-
-      //remove guild data
-      dSet(guildID, prefab);
-      guildData.delete(prefab);
     }
   }
 });
 
-client.on("presenceUpdate", async data => {
+client.on("presenceUpdate", async presenceEvtArgs => {
 
-  if (data === undefined)
+  if (presenceEvtArgs === undefined)
     return;
-  const guildID = data.guild.id;
-  var prefab;
-  if (!(prefab = dPull(guildID)))//data created previously from commmand
-    return;
-  var userid = data.userID;
-  if (prefab.userID != userid)//user matches
+  const guildID = presenceEvtArgs.guild.id;
+  let sData = serverData[guildID];
+  let data = sData[0];
+  let settings = sData[1];
+
+  var userid = presenceEvtArgs.userID;
+  if (data.userID != userid)//user matches
     return;
 
-  var activities = data.user.presence.activities;
+  var activities = presenceEvtArgs.user.presence.activities;
 
   var found = false;
   var activity = null;
@@ -187,20 +203,23 @@ client.on("presenceUpdate", async data => {
 
   console.log("user presence updated");
 
-  http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + prefab.query.replace("$title", songname).replace("$artist", artist) + "&page=1", function (res) {
-    let data = ''
+  http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + settings.query.replace("$title", songname).replace("$artist", artist) + "&page=1", function (res) {
+    let data1 = ''
 
     res.on('data', function (stream) {
-      data += stream;
+      data1 += stream;
     });
     res.on('end', function () {
-      processVideoList(guildID, data, [songname, artist, dNow, songlength, songoffset]);
+      processVideoList(guildID, data1, [songname, artist, dNow, songlength, songoffset]);
     });
   });
   return "0";
 });
 
 function processVideoList(guildID, data, inp) {
+  let sData = serverData[guildID];
+  let settings = sData[1];
+
   json_data = JSON.parse(data);
   songname = inp[0];
   artist = inp[1];
@@ -228,48 +247,20 @@ function processVideoList(guildID, data, inp) {
       };
       if(song.match)
       songlist.push(song);
-      if(songlist.length>max_backup_searches-1)
+      if(songlist.length>settings.max_backup_searches)
         break;
     }
   }
-  console.log(songlist.length + " matches   backupsearches=[" + _maxbackupsearches + "]");
+  console.log(songlist.length + " matches   backupsearches=[" + settings.max_backup_searches + "]");
   downloadData(guildID, songlist, 0, [startDelay, songoffset]);
 }
 
-async function stop(prefab) {
-  prefab.songs = [];
-  if (prefab.connection.dispatcher !== null)
-    prefab.connection.disconnect();
-}
-
-function checkData(guildID) {
-  if (!dPull(guildID)) {
-    console.log("creating guild prefab");
-    const guildPrefab = {
-      guildID: guildID,
-      textChannel: null,
-      voiceChannel: null,
-      connection: null,
-      songs: [],
-      volume: 5,
-      userID: null,
-      playing: false,
-      delay: 0,
-      query: "$title $artist"
-    };
-    dSet(guildID, guildPrefab);
-  }
-}
-function dPull(guildID) {
-  return guildData.get(guildID);
-}
-function dSet(guildID, guildPrefab) {
-  return guildData.set(guildID, guildPrefab);
-}
-
 async function playStream(guildID) {
-  prefab = dPull(guildID);
-  var song = prefab.songs.shift();
+  let sData = serverData[guildID];
+  let data = sData[0];
+  let settings = sData[1];
+
+  var song = data.songs.shift();
   var d = Date.now();
   var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
     frequency: 10,      // in milliseconds.
@@ -279,34 +270,34 @@ async function playStream(guildID) {
   // With a buffer
   myReadableStreamBuffer.put(song.data);
 
-  let dispatcher = prefab.connection
+  let dispatcher = data.connection
     .play(myReadableStreamBuffer)
     .once("speaking", () => {
-      prefab = guildData.get(prefab.guildID);
       console.log("speaking");
-      prefab.textChannel.send(`Start playing: **${song.title}**`);
+      data.textChannel.send(`Start playing: **${song.title}**`);
       song.delay += Date.now() - d;
       console.log("delay=" + song.delay);
-      if (song.delay > prefab.delay)
-        prefab.delay = song.delay + 500;
-      prefab.playing = true;
-      guildData.set(prefab.guildID, prefab);
+      if (song.delay > data.delay)
+        data.delay = song.delay + 500;
+      data.playing = true;
     })
     .on("finish", () => {
-      prefab = guildData.get(prefab.guildID);
       console.log("natural stop");
-      prefab.playing = false;
-      guildData.set(prefab.guildID, prefab);
+      data.playing = false;
     })
     .on("error", (e) => {
       console.log(e);
     });
 
   dispatcher.setVolumeLogarithmic();
-  dispatcher.setVolumeLogarithmic(prefab.volume / 5);
+  dispatcher.setVolumeLogarithmic(settings.volume);
 }
 
 function downloadData(guildID, matchsongs, index, inp) {
+
+  let sData = serverData[guildID];
+  let data = sData[0];
+
   startdelay = inp[0];
   songoffset = inp[1];
 
@@ -330,18 +321,16 @@ function downloadData(guildID, matchsongs, index, inp) {
       console.log("data downloaded");
       end = 1;
 
-      var param = dPull(guildID);
       song.delay = Date.now() - startDelay;
       song.data = buf;
-      param.songs.push(song);
+      data.songs.push(song);
 
-      var delay_old = param.delay;
-      if(song.delay>param.delay)
-        param.delay = song.delay;
-      if (param.playing)
+      var delay_old = data.delay;
+      if(song.delay>data.delay)
+      data.delay = song.delay;
+      if (data.playing)
         delay_old = 0;
 
-      dSet(guildID, param);
       setTimeout(playStream, delay_old, guildID);
       return;
     });
@@ -351,4 +340,3 @@ function downloadData(guildID, matchsongs, index, inp) {
   }
 }
 
-client.login(_token);

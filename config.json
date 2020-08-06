@@ -1,5 +1,28 @@
 {
-"prefix": "",
-"token": "",
-"max_backup_searches": 2
+    "token":"",
+    "formats":
+    [
+        {
+            "prefix":"!",
+            "max_backup_searches": 2,
+            "volume": 2,
+            "query": "$title"
+        },
+        {
+            "prefix":"-",
+            "max_backup_searches": 5,
+            "volume": 5,
+            "query": "$title by $artist"
+        }
+    ],
+    "servers": [
+        {
+            "id":"654776754",
+            "format":0
+        },
+        {
+            "id":"56567845464323",
+            "format":1
+        }
+    ]
 }
