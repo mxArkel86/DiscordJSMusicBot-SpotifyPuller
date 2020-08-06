@@ -3,6 +3,7 @@
 const Discord = require("discord.js");
 const http = require('http');
 const fs = require('fs')
+const ERROR = require('./errorcodes.js')
 var streamBuffers = require('stream-buffers');
 const ytdl = require("ytdl-core");
 const { Console, time } = require("console");
@@ -14,7 +15,6 @@ const { addFormatMeta } = require("ytdl-core/lib/util");
 const { setTimeout } = require("timers");
 ////#endregion
 const serverData = new Map();
-
 var token;
 
 function importSettings(file){
@@ -82,6 +82,10 @@ client.on("message", async message => {
   //checking if server data does exist
   const guildID = message.guild.id;
   let sData = serverData[guildID];
+  if(!sData){
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+    }
   let settings = sData[1];
   let data = sData[0];
   var prefix = settings.prefix;
@@ -144,6 +148,10 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 
   const guildID = oldMember.guild.id;
   let sData = serverData[guildID];
+  if(!sData){
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+    }
   let data = sData[0];
 
   var userid = newMember.member.id;
@@ -171,7 +179,12 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   if (presenceEvtArgs === undefined)
     return;
   const guildID = presenceEvtArgs.guild.id;
+  
   let sData = serverData[guildID];
+  if(!sData){
+  console.log(ERROR.errorcode_1(guildID));
+  return;
+  }
   let data = sData[0];
   let settings = sData[1];
 
@@ -222,6 +235,10 @@ client.on("presenceUpdate", async presenceEvtArgs => {
 
 function processVideoList(guildID, data, inp) {
   let sData = serverData[guildID];
+  if(!sData){
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+    }
   let settings = sData[1];
 
   json_data = JSON.parse(data);
@@ -261,6 +278,11 @@ function processVideoList(guildID, data, inp) {
 
 async function playStream(guildID) {
   let sData = serverData[guildID];
+  if(!sData){
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+    }
+
   let data = sData[0];
   let settings = sData[1];
 
@@ -300,6 +322,11 @@ async function playStream(guildID) {
 function downloadData(guildID, matchsongs, index, inp) {
 
   let sData = serverData[guildID];
+  if(!sData){
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+    }
+    
   let data = sData[0];
 
   startdelay = inp[0];
