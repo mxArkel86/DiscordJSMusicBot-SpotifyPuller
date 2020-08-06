@@ -69,6 +69,10 @@ client.once("disconnect", () => {
   console.log("Disconnect!");
 });
 
+client.on("error", (e)=>{
+  console.log(e);
+});
+
 //#endregion
 function init(){
 client.login(token);
