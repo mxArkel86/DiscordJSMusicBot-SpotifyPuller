@@ -164,7 +164,6 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 
   if (userid == data.userID) {
     if (type == -1) {//user left the channel
-      stop(data);//stop voice interaction
       data.userID = null;//disconnect user link
 
       //if users in channel is 1 or 0
