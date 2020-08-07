@@ -345,9 +345,7 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
     var delay = Date.now() - startDelay;
     var delay_now = data.delay;
     
-    if (data.playing)//if song is still playing
-    delay_now = 0;
-    if (delay >= data.delay){//if new song delay >= old delay
+    if (delay >= data.delay || !data.playing){//if new song delay >= old delay
     data.delay = song.delay;//next delay is higher
     delay_now = 0;
     }else{//new delay is less than old
