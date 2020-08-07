@@ -1,5 +1,6 @@
 {
     "token":"",
+    "downloadUpdateInterval":5,
     "formats":
     [
         {

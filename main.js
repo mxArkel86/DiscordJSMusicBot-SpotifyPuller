@@ -16,12 +16,15 @@ const { setTimeout } = require("timers");
 ////#endregion
 const serverData = new Map();
 var token;
+var downloadUpdateInterval = 1;
+var load_delay = 0;
 
 function importSettings(file) {
   fs.readFile(file, 'utf8', (err, data) => {
     var tree = JSON.parse(data);
 
     token = tree.token;
+    downloadUpdateInterval = tree.downloadUpdateInterval;
 
     for (var guild of tree.servers) {
       let guildSettings = tree.formats[guild.format];
@@ -77,6 +80,31 @@ client.on("error", (e) => {
 function init() {
   client.login(token);
 }
+
+function checkVoice(message){
+  let sData = serverData[message.guild.id];
+  let data = sData[0];
+  const voiceChannel = message.member.voice.channel;
+  if (!voiceChannel){
+    message.channel.send(
+      "You need to be in a voice channel to play music!"
+    );
+    return 1;
+
+  }
+  //check if the bot has proper privileges
+  const permissions = voiceChannel.permissionsFor(message.client.user);
+  if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
+    message.channel.send(
+      "I need the permissions to join and speak in your voice channel!"
+    );
+    return 1;
+  }
+  data.voiceChannel = voiceChannel;
+  data.textChannel = message.channel;
+  return 0;
+}
+
 //on message recieved
 client.on("message", async message => {
   //checking if server data does exist
@@ -95,41 +123,24 @@ client.on("message", async message => {
   if (!message.content.startsWith(prefix)) return;
 
   //initialize voice channel
-  const voiceChannel = message.member.voice.channel;
-  if (!voiceChannel)
-    return message.channel.send(
-      "You need to be in a voice channel to play music!"
-    );
-  //check if the bot has proper privileges
-  const permissions = voiceChannel.permissionsFor(message.client.user);
-  if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
-    return message.channel.send(
-      "I need the permissions to join and speak in your voice channel!"
-    );
-  }
-
-
-  data.voiceChannel = voiceChannel;
-  data.textChannel = message.channel;
-
-
-  if (message.content == `${prefix}link`) {
-    try {
+  
+  if (message.content.startsWith(`${prefix}link`)) {
+      if(checkVoice(message)==1){
+        return;
+      }
       //link to user and clear song queue
       data.userID = message.author.id;
       data.songs = [];
       //initialize connection
-      var connection = await voiceChannel.join();
+      var connection = await data.voiceChannel.join();
       data.connection = connection;
 
       data.textChannel.send("User **" + message.author.username + "** linked");
       return;
-    } catch (err) {
-      console.log(err);
-      serverData.delete(guildID);
+  } else if (message.content.startsWith(`${prefix}stop`)) {
+    if(checkVoice(message)==1){
       return;
     }
-  } else if (message.content.startsWith(`${prefix}stop`)) {
     stop(data);//stop voice interaction
     return;
   } else if (message.content.startsWith(`${prefix}query `)) {
@@ -166,7 +177,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
     if (type == -1) {//user left the channel
       data.userID = null;//disconnect user link
 
-      //if users in channel is 1 or 0
+      //if users in channel is 1
       if (oldUserChannel.members.size < 2)
         oldUserChannel.leave();
     }
@@ -174,7 +185,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 });
 
 client.on("presenceUpdate", async presenceEvtArgs => {
-
+  var dNow = Date.now();
   if (presenceEvtArgs === undefined)
     return;
   const guildID = presenceEvtArgs.guild.id;
@@ -191,13 +202,13 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   if (data.userID != userid)//user matches
     return;
 
-  var activities = presenceEvtArgs.user.presence.activities;
+  var activities = presenceEvtArgs.user.presence.activities;//get user activities
 
   var found = false;
   var activity = null;
   for (a of activities) {
     var name = a.name;
-    if (name != "Spotify")
+    if (name != "Spotify")//if one of the activities is spotify
       continue;
 
     found = true;
@@ -211,7 +222,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   let songname = activity.details;
   let artist = activity.state;
   let timestamps = activity.timestamps;
-  var dNow = Date.now();
+  
   var tStart = Date.parse(timestamps.start);
   var tEnd = Date.parse(timestamps.end);
   var songlength = (tEnd - tStart) / 1000;
@@ -226,10 +237,9 @@ client.on("presenceUpdate", async presenceEvtArgs => {
       data1 += stream;
     });
     res.on('end', function () {
-      processVideoList(guildID, data1, [songname, artist, dNow, songlength, songoffset]);
+      processVideoList(guildID, data1, [songname, artist, dNow, songlength, songoffset]);//parse videos from search
     });
   });
-  return "0";
 });
 
 function processVideoList(guildID, data, inp) {
@@ -239,18 +249,19 @@ function processVideoList(guildID, data, inp) {
     return;
   }
   let settings = sData[1];
-
-  json_data = JSON.parse(data);
+  //get input parameters
   songname = inp[0];
   artist = inp[1];
   startDelay = inp[2];
   songlength = inp[3];
   songoffset = inp[4];
+  json_data = JSON.parse(data);
+
 
   var songlist = [];
   var unbiasedsonglist = [];
 
-  for (var i = 0; i < json_data.results.length; i++) {
+  for (var i = 0; i < json_data.results.length; i++) {//look through every video in request
     console.log("checking video [" + i + "]");
     let video = json_data.results[i].video;
     var duration = 0;
@@ -264,70 +275,34 @@ function processVideoList(guildID, data, inp) {
         url: video.url,
         data: null,
         delay: 0,
-        match: Math.abs(songlength - duration) < 2
+        match: Math.abs(songlength - duration) < 2,
+        lengthdeviation: Math.abs(songlength - duration)
       };
-      if (song.match)
+      if (song.match)//if song is close in length, add to "similar" list
         songlist.push(song);
       else
-        unbiasedsonglist.push(song);
+        unbiasedsonglist.push(song);//if song is not close in length, add to "unbiased" list
       if (songlist.length > settings.max_backup_searches)
         break;
     }
   }
-  console.log(songlist.length + " matches   backupsearches=[" + settings.max_backup_searches + "]");
-  var exitcode = downloadData(guildID, songlist, 0, [startDelay, songoffset]);
-  if (exitcode == 1) {
-    var exitcode1 = downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset]);
-    if (exitcode1 == 1)
-      console.log("music unable to be played");
-    else
-      console.log("unmatched length song found");
+  if (songlist.length > 0) {
+    console.log(songlist.length + " matches   maxBackupSearches=[" + settings.max_backup_searches + "]");
+    songlist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
   }
-}
+  else
+    console.log(unbiasedsonglist.length + " unmatched songs found");
 
-async function playStream(guildID) {
-  let sData = serverData[guildID];
-  if (!sData) {
-    console.log(ERROR.errorcode_1(guildID));
-    return;
-  }
+  unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
 
-  let data = sData[0];
-  let settings = sData[1];
-
-  var song = data.songs.shift();
-  var d = Date.now();
-  var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
-    frequency: 10,      // in milliseconds.
-    chunkSize: 2048     // in bytes.
-  });
-
-  // With a buffer
-  myReadableStreamBuffer.put(song.data);
-
-  let dispatcher = data.connection
-    .play(myReadableStreamBuffer)
-    .once("speaking", () => {
-      console.log("speaking");
-      data.textChannel.send(`Start playing: **${song.title}**`);
-      song.delay += Date.now() - d;
-      console.log("delay=" + song.delay);
-      if (song.delay > data.delay)
-        data.delay = song.delay + 500;
-      data.playing = true;
-    })
-    .on("finish", () => {
-      console.log("natural stop");
-      data.playing = false;
-    })
-    .on("error", (e) => {
-      console.log(e);
+  downloadData(guildID, songlist, 0, [startDelay, songoffset], () => {//download music and if it does not work try the next one in list
+    downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset], () => {//try unmatching music
+      console.log("unmatched length song found");//no music found
     });
-
-  dispatcher.setVolume(settings.volume);
+  });
 }
 
-function downloadData(guildID, matchsongs, index, inp) {
+function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
 
   let sData = serverData[guildID];
   if (!sData) {
@@ -340,43 +315,99 @@ function downloadData(guildID, matchsongs, index, inp) {
   startdelay = inp[0];
   songoffset = inp[1];
 
-  if (index == matchsongs.length)
-    return 1;
+  if (index == matchsongs.length) {//if there is no song in the index position (out of range exception)
+    unsuccessful();//leave with exception
+    return;
+  }
   var song = matchsongs[index];
 
   var bufs = [];
   var unique = 0;
-  try {
-    //, dlChunkSize: 1024
-    ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {
-      bufs.push(chunk);
-    }).on("progress", (chunksize, val, total) => {
-      var percent = Math.round(val * 100 / total);
-      if (percent != unique) {
-        unique = percent;
-        console.log("downloading [" + val + "/" + total + "]  " + Math.round(val * 100 / total) + "%");
+  ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
+    bufs.push(chunk);//add chunks to list
+  }).on("progress", (chunksize, val, total) => {
+    if (downloadUpdateInterval != 0) {
+      var percent = Math.floor(val * 100 / total);
+      var percent_2 = Math.floor(percent / downloadUpdateInterval);
+      if (percent_2 != unique) {
+        unique = percent_2;
+        console.log("downloading [" + val + "/" + total + "]  " + percent + "%");//show download progress
       }
-    }).on("end", () => {
-      var buf = Buffer.concat(bufs);
-      console.log("data downloaded");
-      end = 1;
+    }
+  }).on("end", () => {
+    var buf = Buffer.concat(bufs);//combine data into one buffer
+    console.log("data downloaded");
+    end = 1;
 
-      song.delay = Date.now() - startDelay;
-      song.data = buf;
-      data.songs.push(song);
+    song.data = buf;//add data to song
+    data.songs.push(song)
 
-      var delay_old = data.delay;
-      if (song.delay > data.delay)
-        data.delay = song.delay;
-      if (data.playing)
-        delay_old = 0;
+    var delay = Date.now() - startDelay;
+    var delay_now = data.delay;
+    
+    if (data.playing)//if song is still playing
+    delay_now = 0;
+    if (delay >= data.delay){//if new song delay >= old delay
+    data.delay = song.delay;//next delay is higher
+    delay_now = 0;
+    }else{//new delay is less than old
+      delay_now = data.delay - delay;//difference between delays
+    }
+    
 
-      setTimeout(playStream, delay_old, guildID);
-    });
-  } catch (e) {
-    console.log("song download failed. moving to next one");
-    return downloadData(guildID, matchsongs, index + 1, inp);
-  }
-  return 0;
+
+    console.log("queue adjustment delay=" + delay_now);
+    //pass through start time - previous delay added
+    setTimeout(playStream, delay_now, guildID, [delay]);
+  }).on("error", (e) => {
+    console.log(e);
+    console.log("song download failed. moving to next one [" + index + "+1]");
+    downloadData(guildID, matchsongs, index + 1, inp);
+  });
 }
+
+async function playStream(guildID, inp) {
+  let sData = serverData[guildID];
+  if (!sData) {
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+  }
+  var delay = inp[0];
+  var d = Date.now();
+
+  let data = sData[0];
+  let settings = sData[1];
+
+  var song = data.songs.shift();//pull song from queue
+  var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
+    frequency: 10,      // in milliseconds.
+    chunkSize: 2048     // in bytes.
+  });
+
+  //put stored data into stream
+  myReadableStreamBuffer.put(song.data);
+
+  let dispatcher = data.connection//initialize connection
+    .play(myReadableStreamBuffer)
+    .once("speaking", () => {
+      //display information about playing
+      data.textChannel.send(`Start playing: **${song.title}**`);
+
+      //calculate delay for next song in queue
+      song.delay = delay + Date.now()-d;
+      data.playing = true;
+      console.log("total delay=" + song.delay);
+      console.log("playing");
+    })
+    .on("finish", () => {
+      console.log("song stopped");
+      data.playing = false;
+    })
+    .on("error", (e) => {
+      console.log(e);
+    });
+  dispatcher.setVolume(settings.volume);
+}
+
+
 
