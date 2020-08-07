@@ -17,13 +17,13 @@ const { setTimeout } = require("timers");
 const serverData = new Map();
 var token;
 
-function importSettings(file){
-  fs.readFile(file, 'utf8', (err, data)=>{
+function importSettings(file) {
+  fs.readFile(file, 'utf8', (err, data) => {
     var tree = JSON.parse(data);
 
     token = tree.token;
-    
-    for(var guild of tree.servers){
+
+    for (var guild of tree.servers) {
       let guildSettings = tree.formats[guild.format];
       const guildData = {
         textChannel: null,
@@ -38,9 +38,9 @@ function importSettings(file){
     }
     init();
   });
- 
-  
-  
+
+
+
   //dSet(guildID, guildPrefab);
 }
 if (fs.existsSync('./configOverride.json')) {
@@ -69,23 +69,23 @@ client.once("disconnect", () => {
   console.log("Disconnect!");
 });
 
-client.on("error", (e)=>{
+client.on("error", (e) => {
   console.log(e);
 });
 
 //#endregion
-function init(){
-client.login(token);
+function init() {
+  client.login(token);
 }
 //on message recieved
 client.on("message", async message => {
   //checking if server data does exist
   const guildID = message.guild.id;
   let sData = serverData[guildID];
-  if(!sData){
+  if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
-    }
+  }
   let settings = sData[1];
   let data = sData[0];
   var prefix = settings.prefix;
@@ -108,7 +108,7 @@ client.on("message", async message => {
     );
   }
 
-  
+
   data.voiceChannel = voiceChannel;
   data.textChannel = message.channel;
 
@@ -134,7 +134,7 @@ client.on("message", async message => {
     return;
   } else if (message.content.startsWith(`${prefix}query `)) {
     settings.query = message.content.substr(`${prefix}query`.length + 1)//change query to find youtube video
-    
+
     message.channel.send("updated query");
     return;
   } else {
@@ -148,10 +148,10 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 
   const guildID = oldMember.guild.id;
   let sData = serverData[guildID];
-  if(!sData){
+  if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
-    }
+  }
   let data = sData[0];
 
   var userid = newMember.member.id;
@@ -179,11 +179,11 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   if (presenceEvtArgs === undefined)
     return;
   const guildID = presenceEvtArgs.guild.id;
-  
+
   let sData = serverData[guildID];
-  if(!sData){
-  console.log(ERROR.errorcode_1(guildID));
-  return;
+  if (!sData) {
+    console.log(ERROR.errorcode_1(guildID));
+    return;
   }
   let data = sData[0];
   let settings = sData[1];
@@ -235,10 +235,10 @@ client.on("presenceUpdate", async presenceEvtArgs => {
 
 function processVideoList(guildID, data, inp) {
   let sData = serverData[guildID];
-  if(!sData){
+  if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
-    }
+  }
   let settings = sData[1];
 
   json_data = JSON.parse(data);
@@ -249,6 +249,7 @@ function processVideoList(guildID, data, inp) {
   songoffset = inp[4];
 
   var songlist = [];
+  var unbiasedsonglist = [];
 
   for (var i = 0; i < json_data.results.length; i++) {
     console.log("checking video [" + i + "]");
@@ -266,22 +267,31 @@ function processVideoList(guildID, data, inp) {
         delay: 0,
         match: Math.abs(songlength - duration) < 2
       };
-      if(song.match)
-      songlist.push(song);
-      if(songlist.length>settings.max_backup_searches)
+      if (song.match)
+        songlist.push(song);
+      else
+        unbiasedsonglist.push(song);
+      if (songlist.length > settings.max_backup_searches)
         break;
     }
   }
   console.log(songlist.length + " matches   backupsearches=[" + settings.max_backup_searches + "]");
-  downloadData(guildID, songlist, 0, [startDelay, songoffset]);
+  var exitcode = downloadData(guildID, songlist, 0, [startDelay, songoffset]);
+  if (exitcode == 1) {
+    var exitcode1 = downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset]);
+    if (exitcode1 == 1)
+      console.log("music unable to be played");
+    else
+      console.log("unmatched length song found");
+  }
 }
 
 async function playStream(guildID) {
   let sData = serverData[guildID];
-  if(!sData){
+  if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
-    }
+  }
 
   let data = sData[0];
   let settings = sData[1];
@@ -321,24 +331,25 @@ async function playStream(guildID) {
 function downloadData(guildID, matchsongs, index, inp) {
 
   let sData = serverData[guildID];
-  if(!sData){
+  if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
-    }
-    
+  }
+
   let data = sData[0];
 
   startdelay = inp[0];
   songoffset = inp[1];
 
+  if (index == matchsongs.length)
+    return 1;
   var song = matchsongs[index];
 
   var bufs = [];
   var unique = 0;
-  var end = 0;
   try {
     //, dlChunkSize: 1024
-    ytdl(song.url, { filter: 'audioonly', begin: songoffset }).on("data", (chunk) => {
+    ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {
       bufs.push(chunk);
     }).on("progress", (chunksize, val, total) => {
       var percent = Math.round(val * 100 / total);
@@ -356,17 +367,17 @@ function downloadData(guildID, matchsongs, index, inp) {
       data.songs.push(song);
 
       var delay_old = data.delay;
-      if(song.delay>data.delay)
-      data.delay = song.delay;
+      if (song.delay > data.delay)
+        data.delay = song.delay;
       if (data.playing)
         delay_old = 0;
 
       setTimeout(playStream, delay_old, guildID);
-      return;
     });
   } catch (e) {
     console.log("song download failed. moving to next one");
-    downloadData(guildID, matchsongs, index+1, inp);
+    return downloadData(guildID, matchsongs, index + 1, inp);
   }
+  return 0;
 }
 
