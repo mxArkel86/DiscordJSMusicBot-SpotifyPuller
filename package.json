@@ -101,6 +101,6 @@
       "resolved": "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz",
       "version": "1.0.2"
     },
-    "ytdl-core": "^3.2.0"
+    "ytdl-core": "^3.2.1"
   }
 }
