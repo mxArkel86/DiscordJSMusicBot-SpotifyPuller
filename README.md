@@ -1,20 +1,33 @@
 # DiscordMusicBot
 
-**A discord music bot that plays the song you are currently listening to on spotify (no login needed)**
+<h2>A discord music bot that grabs the spotify status present in discord to play the song you are currently listening to</h2>
 
 ---------------------------------------------------
-The bot is a work in progress project built for 
-nodejs with the discord.js library to allow access 
-to the discord api
+<h4>The bot is a work in progress project built for nodejs with the discord.js library to allow access to the discord api</h4>
 
-**Initial setup:**
-go into the config.json file and add your server id to "<\server id placeholder>", and your selected prefix into <\prefix placeholder>. If you do not know your server id, type in @serverid and your id will be given
 
-The bot is made to expect some lag between a song being switched to by the spotify user and it being played by the bot. The amount of delay is naturally determined by the internet speed of the host. Delay is overlapped so a song with high delay will have its delay amount used for the proceeding tracks in order to have the whole song play through. Delay is reset by a song being played out of order. Thats pretty much all that is to be said.*
+<br><h2>Initial setup:</h2>
+<span>Go into the config.json file and add your server id to 'server id placeholder', and your selected prefix into 'prefix placeholder'. If you do not know your server id, type </span><span><b>@serverid</b></span><span> in any text channel in your server and your id will be given</span>
+
+---------------------------------------------------
+<h2>Hint</h2>
+<p>The bot is made to expect some lag between a song being switched to by the spotify user and it being played by the bot. The amount of delay is naturally determined by the internet speed of the host. Delay is overlapped so a song with high delay will have its delay amount used for the proceeding tracks in order to have the whole song play through. Delay is reset by a song being played out of order. Thats pretty much all that is to be said.</p>
 
 
 *Please report bug fixes in order to improve the experience of others*
+<br><br>
+<h2>Breakdown</h2>
+<span>The bot goes through the same process whenever it decides to play a song:<br></span><br>
+<p>
+    waits for the status of a user to change<br>
+    checks parameters to make sure the user is the right one and no errors may run<br>
+    grabs a list of songs from youtube using a search query defined by the status of the user and formatted by the config file<br>
+    attempts to download a song using ytdl-core, and switching to a backup song if an error occurs<br>
+    plays the song when the first byte is received<br></p>
+    <span>By going through this process, song delay between detection and playing is minimized up to the limitations of the user's network capabilities and processing speeds of subpackages like ytdl-core
+</span><br><br>
 
+**Here is a breakdown of the config.json file**<br>
 **Config File** *(please use the included config file which is without comments)* <br>
 *<config.json>* <br>
 <pre>
