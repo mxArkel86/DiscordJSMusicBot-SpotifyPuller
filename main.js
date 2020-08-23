@@ -23,11 +23,14 @@ const guildDataDef = {
   textChannel: null,
   voiceChannel: null,
   connection: null,
-  songs: [],
+  songqueue: [],
   userID: null,
   playing: false,
   delay: 0,
-  commandqueue:[]
+  stream: new streamBuffers.ReadableStreamBuffer({
+    frequency: 10,      // in milliseconds.
+    chunkSize: 2048     // in bytes.
+  }),
 };
 
 function importSettings(file) {
@@ -83,13 +86,13 @@ function init() {
   client.login(token);
 }
 
-function writeHelpCommands(channel){
-  fs.readFile("help.txt", { encoding:'utf8'}, (err, d)=>{
+function writeHelpCommands(channel) {
+  fs.readFile("help.txt", { encoding: 'utf8' }, (err, d) => {
     var msg = "";
-    for(var line of d.split('\n')){
-      if(line.includes(':'))
-      msg+='**' + line.replace(':', ':**');
-      else msg+=line;
+    for (var line of d.split('\n')) {
+      if (line.includes(':'))
+        msg += '**' + line.replace(':', ':**');
+      else msg += line;
     }
     channel.send(msg);
   });
@@ -121,7 +124,7 @@ client.on("message", async message => {
   //if message is not from a bot
   if (message.author.bot) return;
   //if message is truly a command
-  if(message.content=="@serverid"){
+  if (message.content == "@serverid") {
     message.channel.send(message.guild.id);
     return;
   }
@@ -137,34 +140,34 @@ client.on("message", async message => {
       var username_ = message.content.split(' ')[1].toLowerCase();
       //fetch user in guild by username
       var userlist = await message.guild.members.fetch({});
-        for(var uobj of userlist){
-          var u = uobj[1];
-          if(u.displayName.toLowerCase() == username_){
-            var voicechann = u.voice.channel;
-            if(contentleng>2){
-              if(message.content.split(' ')[2]=='here'){
-                voicechann = currentuser.voice;
-                if(voicechann==null){
-                  data.textChannel.send(ERROR.errorcode_3(u.displayName));
-                  return;
-                }
-              }
-            }else{
-              if(voicechann==null){
+      for (var uobj of userlist) {
+        var u = uobj[1];
+        if (u.displayName.toLowerCase() == username_) {
+          var voicechann = u.voice.channel;
+          if (contentleng > 2) {
+            if (message.content.split(' ')[2] == 'here') {
+              voicechann = currentuser.voice;
+              if (voicechann == null) {
                 data.textChannel.send(ERROR.errorcode_3(u.displayName));
                 return;
               }
             }
-
-            linkUser(data, u, u.voice.channel);
-            return;
+          } else {
+            if (voicechann == null) {
+              data.textChannel.send(ERROR.errorcode_3(u.displayName));
+              return;
+            }
           }
+
+          linkUser(data, u, u.voice.channel);
+          return;
+        }
       }
       data.textChannel.send(ERROR.errorcode_2(username_));
-          return;
+      return;
     } else {
       //link to user and clear song queue
-      if(currentuser.voice.channel==null){
+      if (currentuser.voice.channel == null) {
         data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
         return;
       }
@@ -173,7 +176,7 @@ client.on("message", async message => {
 
     return;
   } else if (message.content == `${prefix}stop`) {
-    if(currentuser.voice.channel.id!=data.voiceChannel.id){
+    if (currentuser.voice.channel.id != data.voiceChannel.id) {
       message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
     }
@@ -184,7 +187,7 @@ client.on("message", async message => {
   } if (message.content == `${prefix}help`) {
     writeHelpCommands(channel);
     return;
-  }else {
+  } else {
     message.channel.send("You need to enter a valid command!");
   }
 });
@@ -258,9 +261,15 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   let songname = activity.details;
   let artist = activity.state;
   let timestamps = activity.timestamps;
-  if(data.commandqueue.includes(songname))
-  return;
-  data.commandqueue.push(songname);
+  //check if song is already playing
+  if (data.songqueue.find(s => s.title == songname)!=null)
+    return;
+  const song = {
+    title: songname,
+    artist: artist
+  };
+  //add song to queue
+  data.songqueue.push(song);
   var tStart = Date.parse(timestamps.start);
   var tEnd = Date.parse(timestamps.end);
   var songlength = (tEnd - tStart) / 1000;
@@ -268,6 +277,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
 
   console.log("user presence updated");
 
+  
   http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + settings.query.replace("$title", songname).replace("$artist", artist) + "&page=1", function (res) {
     let data1 = ''
 
@@ -306,20 +316,15 @@ function processVideoList(guildID, data, inp) {
     if (video != undefined) {
       let dur = video.duration;
       duration = (parseInt(dur.split(':')[0]) * 60 + parseInt(dur.split(':')[1]));
-
-      const song = {
-        title: songname,
-        artist: artist,
+      var videosong = {
         url: video.url,
-        data: null,
-        delay: 0,
         match: Math.abs(songlength - duration) < 2,
         lengthdeviation: Math.abs(songlength - duration)
-      };
-      if (song.match)//if song is close in length, add to "similar" list
-        songlist.push(song);
+      }
+      if (videosong.match)//if song is close in length, add to "similar" list
+        songlist.push(videosong);
       else
-        unbiasedsonglist.push(song);//if song is not close in length, add to "unbiased" list
+        unbiasedsonglist.push(videosong);//if song is not close in length, add to "unbiased" list
       if (songlist.length > settings.max_backup_searches)
         break;
     }
@@ -331,7 +336,10 @@ function processVideoList(guildID, data, inp) {
   else
     console.log(unbiasedsonglist.length + " unmatched songs found");
 
-  unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
+    setTimeout(()=>{
+      unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
+    }, 0);
+  
 
   downloadData(guildID, songlist, 0, [startDelay, songoffset], () => {//download music and if it does not work try the next one in list
     downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset], () => {//try unmatching music
@@ -359,10 +367,29 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
   }
   var song = matchsongs[index];
 
-  var bufs = [];
   var unique = 0;
+  var firstchunk = 1;
   ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
-    bufs.push(chunk);//add chunks to list
+    data.stream.put(chunk);
+    if (firstchunk == 1) {
+      firstchunk = 0;
+      var delay = Date.now() - startDelay;
+      var action = 0;
+      var delay_now = data.delay;
+
+      if (delay >= data.delay || !data.playing) {//if new song delay >= old delay
+        action = 1;
+        data.delay = song.delay;//next delay is higher
+        delay_now = 0;
+      } else {//new delay is less than old
+        action = -1;
+        delay_now = data.delay - delay;//difference between delays
+      }
+
+      console.log('song play delay=' + delay + " [" + action + "]");
+      console.log("queue adjustment delay=" + delay_now);
+      setTimeout(playStream, delay_now, guildID, [delay]);
+    }
   }).on("progress", (chunksize, val, total) => {
     if (downloadUpdateInterval != 0) {
       var percent = Math.floor(val * 100 / total);
@@ -372,29 +399,6 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
         console.log("downloading [" + val + "/" + total + "]  " + percent + "%");//show download progress
       }
     }
-  }).on("end", () => {
-    var buf = Buffer.concat(bufs);//combine data into one buffer
-    console.log("data downloaded");
-    end = 1;
-
-    song.data = buf;//add data to song
-    data.songs.push(song)
-
-    var delay = Date.now() - startDelay;
-    var delay_now = data.delay;
-
-    if (delay >= data.delay || !data.playing) {//if new song delay >= old delay
-      data.delay = song.delay;//next delay is higher
-      delay_now = 0;
-    } else {//new delay is less than old
-      delay_now = data.delay - delay;//difference between delays
-    }
-
-
-
-    console.log("queue adjustment delay=" + delay_now);
-    //pass through start time - previous delay added
-    setTimeout(playStream, delay_now, guildID, [delay]);
   }).on("error", (e) => {
     console.log(e);
     console.log("song download failed. moving to next one [" + index + "+1]");
@@ -414,28 +418,15 @@ async function playStream(guildID, inp) {
   let data = sData[0];
   let settings = sData[1];
 
-  var song = data.songs.shift();//pull song from queue
-  var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
-    frequency: 10,      // in milliseconds.
-    chunkSize: 2048     // in bytes.
-  });
-
-  //put stored data into stream
-  myReadableStreamBuffer.put(song.data);
-  data.commandqueue.shift();
+  var song = data.songqueue.shift();
 
   let dispatcher = data.connection//initialize connection
-    .play(myReadableStreamBuffer)
+    .play(data.stream)
     .once("speaking", () => {
       data.connection.setSpeaking(1);
       //display information about playing
-      data.textChannel.send(`Start playing: **${song.title}**`);
-
-      //calculate delay for next song in queue
-      song.delay = delay + Date.now() - d;
+      data.textChannel.send(`Start playing: **${song.title} by ${song.artist}**`);
       data.playing = true;
-      console.log("total delay=" + song.delay);
-      console.log("playing");
     })
     .on("finish", () => {
       console.log("song stopped");
