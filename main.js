@@ -19,6 +19,12 @@ var token;
 var downloadUpdateInterval = 1;
 var load_delay = 0;
 
+let stream_ = new streamBuffers.ReadableStreamBuffer({
+  frequency: 10,      // in milliseconds.
+  chunkSize: 2048     // in bytes.
+});
+
+
 const guildDataDef = {
   textChannel: null,
   voiceChannel: null,
@@ -27,10 +33,8 @@ const guildDataDef = {
   userID: null,
   playing: false,
   delay: 0,
-  stream: new streamBuffers.ReadableStreamBuffer({
-    frequency: 10,      // in milliseconds.
-    chunkSize: 2048     // in bytes.
-  }),
+  stream: stream_,
+  broadcast: null
 };
 
 function importSettings(file) {
@@ -369,8 +373,15 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
 
   var unique = 0;
   var firstchunk = 1;
+  var ready = 0;
+  var buff = [];
+  data.stream = stream_;
   ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
+    if(ready==0)
+    buff.push(chunk);
+    else
     data.stream.put(chunk);
+    
     if (firstchunk == 1) {
       firstchunk = 0;
       var delay = Date.now() - startDelay;
@@ -379,16 +390,18 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
 
       if (delay >= data.delay || !data.playing) {//if new song delay >= old delay
         action = 1;
-        data.delay = song.delay;//next delay is higher
+        data.delay = delay;//next delay is higher
         delay_now = 0;
       } else {//new delay is less than old
         action = -1;
         delay_now = data.delay - delay;//difference between delays
       }
-
       console.log('song play delay=' + delay + " [" + action + "]");
       console.log("queue adjustment delay=" + delay_now);
-      setTimeout(playStream, delay_now, guildID, [delay]);
+      setTimeout(playStream, delay_now, guildID, function(){
+        data.stream.put(Buffer.concat(buff));
+        ready = 1;
+      });
     }
   }).on("progress", (chunksize, val, total) => {
     if (downloadUpdateInterval != 0) {
@@ -406,37 +419,45 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
   });
 }
 
-async function playStream(guildID, inp) {
+async function playStream(guildID, ready) {
+  if(data.broadcast!=null){
+    data.broadcast.end();
+  }
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
   }
-  var delay = inp[0];
-  var d = Date.now();
 
   let data = sData[0];
   let settings = sData[1];
-
+  
+  
   var song = data.songqueue.shift();
-
-  let dispatcher = data.connection//initialize connection
-    .play(data.stream)
-    .once("speaking", () => {
-      data.connection.setSpeaking(1);
-      //display information about playing
-      data.textChannel.send(`Start playing: **${song.title} by ${song.artist}**`);
-      data.playing = true;
-    })
-    .on("finish", () => {
-      console.log("song stopped");
-      data.connection.setSpeaking(0);
-      data.playing = false;
-    })
-    .on("error", (e) => {
-      console.log(e);
-    });
-  dispatcher.setVolume(settings.volume);
+  ready();
+  const broadcast = client.voice.createBroadcast();
+  broadcast.play(data.stream);
+  data.broadcast = broadcast;
+// Play "music.mp3" in all voice connections that the client is in
+let dispatcher = data.connection//initialize connection
+.play(broadcast)
+.once("speaking", () => {
+  //display information about playing
+  data.textChannel.send(`Start playing: **${song.title} by ${song.artist}**`);
+  data.playing = true;
+})
+.on("finish", () => {
+  if(data.playing==false){
+  console.log("song stopped");
+  data.songqueue.unshift(song);
+  playStream(guildID);
+  }
+  data.playing = false;
+})
+.on("error", (e) => {
+  
+});
+dispatcher.setVolume(settings.volume);
 }
 
 
