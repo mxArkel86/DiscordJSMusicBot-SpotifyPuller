@@ -1,0 +1,6 @@
+     **Spotify-Puller bot help commands**
+link: links the bot to the user that execute the commands
+link <username>: links the bot to the spotify user with the specified display name
+link <username> here: links the bot the the spotify user with the specified display names but connects the bot to the channel of the user that invoked it
+stop: disconnects the bot from the voice channel and removes it's data
+help: shows a list of commands that can be executed by the bot

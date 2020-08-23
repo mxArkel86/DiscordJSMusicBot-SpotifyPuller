@@ -19,6 +19,16 @@ var token;
 var downloadUpdateInterval = 1;
 var load_delay = 0;
 
+const guildDataDef = {
+  textChannel: null,
+  voiceChannel: null,
+  connection: null,
+  songs: [],
+  userID: null,
+  playing: false,
+  delay: 0
+};
+
 function importSettings(file) {
   fs.readFile(file, 'utf8', (err, data) => {
     var tree = JSON.parse(data);
@@ -28,16 +38,7 @@ function importSettings(file) {
 
     for (var guild of tree.servers) {
       let guildSettings = tree.formats[guild.format];
-      const guildData = {
-        textChannel: null,
-        voiceChannel: null,
-        connection: null,
-        songs: [],
-        userID: null,
-        playing: false,
-        delay: 0
-      };
-      serverData[guild.id] = [guildData, guildSettings];
+      serverData[guild.id] = [guildDataDef, guildSettings];
     }
     init();
   });
@@ -81,33 +82,32 @@ function init() {
   client.login(token);
 }
 
-function checkVoice(message){
-  let sData = serverData[message.guild.id];
-  let data = sData[0];
-  const voiceChannel = message.member.voice.channel;
-  if (!voiceChannel){
-    message.channel.send(
-      "You need to be in a voice channel to play music!"
-    );
-    return 1;
+function writeHelpCommands(channel){
+  fs.readFile("help.txt", { encoding:'utf8'}, (err, d)=>{
+    var msg = "";
+    for(var line of d.split('\n')){
+      if(line.includes(':'))
+      msg+='**' + line.replace(':', ':**');
+      else msg+=line;
+    }
+    channel.send(msg);
+  });
+}
 
-  }
-  //check if the bot has proper privileges
-  const permissions = voiceChannel.permissionsFor(message.client.user);
-  if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
-    message.channel.send(
-      "I need the permissions to join and speak in your voice channel!"
-    );
-    return 1;
-  }
-  data.voiceChannel = voiceChannel;
-  data.textChannel = message.channel;
-  return 0;
+async function linkUser(data, user, voicechannel) {
+
+  data.userID = user.id;
+  data.songs = [];
+  //initialize connection
+  data.connection = await voicechannel.join();
+  data.textChannel.send("Spotify of **" + user.displayName + "** linked to **" + voicechannel.name + "**");
 }
 
 //on message recieved
 client.on("message", async message => {
   //checking if server data does exist
+  var currentuser = message.guild.member(message.author.id);
+
   const guildID = message.guild.id;
   let sData = serverData[guildID];
   if (!sData) {
@@ -120,35 +120,70 @@ client.on("message", async message => {
   //if message is not from a bot
   if (message.author.bot) return;
   //if message is truly a command
-  if (!message.content.startsWith(prefix)) return;
+  if(message.content=="@serverid"){
+    message.channel.send(message.guild.id);
+    return;
+  }
 
+  if (!message.content.startsWith(prefix)) return;
   //initialize voice channel
-  
+
   if (message.content.startsWith(`${prefix}link`)) {
-      if(checkVoice(message)==1){
+    data.textChannel = message.channel;
+    var contentleng = message.content.split(' ').length;
+    //if message contains a second parameter
+    if (contentleng > 1) {
+      var username_ = message.content.split(' ')[1].toLowerCase();
+      //fetch user in guild by username
+      var userlist = await message.guild.members.fetch({});
+        for(var uobj of userlist){
+          var u = uobj[1];
+          if(u.displayName.toLowerCase() == username_){
+            var voicechann = u.voice.channel;
+            if(contentleng>2){
+              if(message.content.split(' ')[2]=='here'){
+                voicechann = currentuser.voice;
+                if(voicechann==null){
+                  data.textChannel.send(ERROR.errorcode_3(u.displayName));
+                  return;
+                }
+              }
+            }else{
+              if(voicechann==null){
+                data.textChannel.send(ERROR.errorcode_3(u.displayName));
+                return;
+              }
+            }
+
+            linkUser(data, u, u.voice.channel);
+            return;
+          }
+      }
+      data.textChannel.send(ERROR.errorcode_2(username_));
+          return;
+    } else {
+      //link to user and clear song queue
+      if(currentuser.voice.channel==null){
+        data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
         return;
       }
-      //link to user and clear song queue
-      data.userID = message.author.id;
-      data.songs = [];
-      //initialize connection
-      var connection = await data.voiceChannel.join();
-      data.connection = connection;
+      linkUser(data, currentuser, currentuser.voice.channel);
+    }
 
-      data.textChannel.send("User **" + message.author.username + "** linked");
-      return;
-  } else if (message.content.startsWith(`${prefix}stop`)) {
-    if(checkVoice(message)==1){
+    return;
+  } else if (message.content == `${prefix}stop`) {
+    if(currentuser.voice.channel.id!=data.voiceChannel.id){
+      message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
     }
-    stop(data);//stop voice interaction
+    client.voice.connections.get(guildID).disconnect();
+    data = guildDataDef;
+    message.channel.send('Bot disconnected from voice channel');
     return;
-  } else if (message.content.startsWith(`${prefix}query `)) {
-    settings.query = message.content.substr(`${prefix}query`.length + 1)//change query to find youtube video
-
-    message.channel.send("updated query");
+  } if (message.content == `${prefix}help`) {
+    writeHelpCommands(channel);
     return;
-  } else {
+  }else {
     message.channel.send("You need to enter a valid command!");
   }
 });
@@ -222,7 +257,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   let songname = activity.details;
   let artist = activity.state;
   let timestamps = activity.timestamps;
-  
+
   var tStart = Date.parse(timestamps.start);
   var tEnd = Date.parse(timestamps.end);
   var songlength = (tEnd - tStart) / 1000;
@@ -344,14 +379,14 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
 
     var delay = Date.now() - startDelay;
     var delay_now = data.delay;
-    
-    if (delay >= data.delay || !data.playing){//if new song delay >= old delay
-    data.delay = song.delay;//next delay is higher
-    delay_now = 0;
-    }else{//new delay is less than old
+
+    if (delay >= data.delay || !data.playing) {//if new song delay >= old delay
+      data.delay = song.delay;//next delay is higher
+      delay_now = 0;
+    } else {//new delay is less than old
       delay_now = data.delay - delay;//difference between delays
     }
-    
+
 
 
     console.log("queue adjustment delay=" + delay_now);
@@ -388,17 +423,19 @@ async function playStream(guildID, inp) {
   let dispatcher = data.connection//initialize connection
     .play(myReadableStreamBuffer)
     .once("speaking", () => {
+      data.connection.setSpeaking(1);
       //display information about playing
       data.textChannel.send(`Start playing: **${song.title}**`);
 
       //calculate delay for next song in queue
-      song.delay = delay + Date.now()-d;
+      song.delay = delay + Date.now() - d;
       data.playing = true;
       console.log("total delay=" + song.delay);
       console.log("playing");
     })
     .on("finish", () => {
       console.log("song stopped");
+      data.connection.setSpeaking(0);
       data.playing = false;
     })
     .on("error", (e) => {
