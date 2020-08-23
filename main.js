@@ -26,7 +26,8 @@ const guildDataDef = {
   songs: [],
   userID: null,
   playing: false,
-  delay: 0
+  delay: 0,
+  commandqueue:[]
 };
 
 function importSettings(file) {
@@ -257,7 +258,9 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   let songname = activity.details;
   let artist = activity.state;
   let timestamps = activity.timestamps;
-
+  if(data.commandqueue.includes(songname))
+  return;
+  data.commandqueue.push(songname);
   var tStart = Date.parse(timestamps.start);
   var tEnd = Date.parse(timestamps.end);
   var songlength = (tEnd - tStart) / 1000;
@@ -419,6 +422,7 @@ async function playStream(guildID, inp) {
 
   //put stored data into stream
   myReadableStreamBuffer.put(song.data);
+  data.commandqueue.shift();
 
   let dispatcher = data.connection//initialize connection
     .play(myReadableStreamBuffer)
