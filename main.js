@@ -13,16 +13,11 @@ const { exit } = require("process");
 const stream = require('stream');
 const { addFormatMeta } = require("ytdl-core/lib/util");
 const { setTimeout } = require("timers");
+const { UV_FS_O_FILEMAP } = require("constants");
 ////#endregion
 const serverData = new Map();
 var token;
 var downloadUpdateInterval = 1;
-var load_delay = 0;
-
-let stream_ = new streamBuffers.ReadableStreamBuffer({
-  frequency: 10,      // in milliseconds.
-  chunkSize: 2048     // in bytes.
-});
 
 
 const guildDataDef = {
@@ -33,8 +28,8 @@ const guildDataDef = {
   userID: null,
   playing: false,
   delay: 0,
-  stream: stream_,
-  broadcast: null
+  stream: null,
+  dispatcher: null
 };
 
 function importSettings(file) {
@@ -108,6 +103,7 @@ async function linkUser(data, user, voicechannel) {
   data.songs = [];
   //initialize connection
   data.connection = await voicechannel.join();
+  data.voiceChannel = voicechannel;
   data.textChannel.send("Spotify of **" + user.displayName + "** linked to **" + voicechannel.name + "**");
 }
 
@@ -163,7 +159,7 @@ client.on("message", async message => {
             }
           }
 
-          linkUser(data, u, u.voice.channel);
+          linkUser(data, u, voicechann);
           return;
         }
       }
@@ -266,7 +262,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   let artist = activity.state;
   let timestamps = activity.timestamps;
   //check if song is already playing
-  if (data.songqueue.find(s => s.title == songname)!=null)
+  if (data.songqueue.find(s => s.title == songname) != null)
     return;
   const song = {
     title: songname,
@@ -281,7 +277,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
 
   console.log("user presence updated");
 
-  
+
   http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + settings.query.replace("$title", songname).replace("$artist", artist) + "&page=1", function (res) {
     let data1 = ''
 
@@ -340,20 +336,18 @@ function processVideoList(guildID, data, inp) {
   else
     console.log(unbiasedsonglist.length + " unmatched songs found");
 
-    setTimeout(()=>{
-      unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
-    }, 0);
-  
+  setTimeout(() => {
+    unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
+  }, 0);
 
-  downloadData(guildID, songlist, 0, [startDelay, songoffset], function() {//download music and if it does not work try the next one in list
-    downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset], function() {//try unmatching music
+  downloadData(() => {
+    downloadData(() => {
       console.log("unmatched length song found");//no music found
-    });
-  });
+    }, guildID, unbiasedsonglist, 0, [startDelay, songoffset]);
+  }, guildID, songlist, 0, [startDelay, songoffset]);
 }
 
-function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
-
+function downloadData(unsuccessful, guildID, matchsongs, index, inp) {
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -366,29 +360,34 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
   songoffset = inp[1];
 
   if (index == matchsongs.length) {//if there is no song in the index position (out of range exception)
-    unsuccessful();//leave with exception
+    unsuccessful(guildID);//leave with exception
     return;
   }
   var song = matchsongs[index];
 
   var unique = 0;
   var firstchunk = 1;
-  var ready = 0;
-  var buff = [];
-  data.stream = stream_;
+
+  
   ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
-    if(ready==0)
-    buff.push(chunk);
-    else
-    data.stream.put(chunk);
     
+
     if (firstchunk == 1) {
+      if(data.stream!=null)
+      data.stream.destroy();
+      data.stream = new streamBuffers.ReadableStreamBuffer({
+        frequency: 10,      // in milliseconds.
+        chunkSize: 2048     // in bytes.
+      });
+      data.stream.on('end', ()=>{
+        data.playing = false;
+      });
       firstchunk = 0;
       var delay = Date.now() - startDelay;
       var action = 0;
       var delay_now = data.delay;
 
-      if (delay >= data.delay || !data.playing) {//if new song delay >= old delay
+      if (delay >= data.delay || data.playing) {//if new song delay >= old delay
         action = 1;
         data.delay = delay;//next delay is higher
         delay_now = 0;
@@ -396,13 +395,12 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
         action = -1;
         delay_now = data.delay - delay;//difference between delays
       }
+
       console.log('song play delay=' + delay + " [" + action + "]");
       console.log("queue adjustment delay=" + delay_now);
-      setTimeout(playStream, delay_now, guildID, function(){
-        data.stream.put(Buffer.concat(buff));
-        ready = 1;
-      });
+      setTimeout(playStream, delay_now, guildID);
     }
+    data.stream.put(chunk);
   }).on("progress", (chunksize, val, total) => {
     if (downloadUpdateInterval != 0) {
       var percent = Math.floor(val * 100 / total);
@@ -413,13 +411,13 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
       }
     }
   }).on("error", (e) => {
-    console.log(e);
     console.log("song download failed. moving to next one [" + index + "+1]");
-    downloadData(guildID, matchsongs, index + 1, inp);
+    downloadData(unsuccessful, guildID, matchsongs, index + 1, inp);
   });
 }
 
-async function playStream(guildID, ready) {
+async function playStream(guildID) {
+  console.log('play stream');
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -428,36 +426,18 @@ async function playStream(guildID, ready) {
 
   let data = sData[0];
   let settings = sData[1];
-  if(data.broadcast!=null){
-    data.broadcast.end();
-  }
-  
-  
+
   var song = data.songqueue.shift();
-  ready();
-  const broadcast = client.voice.createBroadcast();
-  broadcast.play(data.stream);
-  data.broadcast = broadcast;
-// Play "music.mp3" in all voice connections that the client is in
-let dispatcher = data.connection//initialize connection
-.play(broadcast)
-.once("speaking", () => {
-  //display information about playing
-  data.textChannel.send(`Start playing: **${song.title} by ${song.artist}**`);
-  data.playing = true;
-})
-.on("finish", () => {
-  if(data.playing==false){
-  console.log("song stopped");
-  data.songqueue.unshift(song);
-  playStream(guildID);
-  }
-  data.playing = false;
-})
-.on("error", (e) => {
-  
-});
-dispatcher.setVolume(settings.volume);
+  var dispatcher = data.connection.play(data.stream);
+  dispatcher.on('start', ()=>{
+    data.textChannel.send(`Start playing: **${song.title} by ${song.artist}**`);
+    data.playing = true;
+  });
+  dispatcher.on('error', (e)=>{
+    console.log(e);
+  });
+  dispatcher.setVolume(settings.volume);
+  data.dispatcher = dispatcher;
 }
 
 
