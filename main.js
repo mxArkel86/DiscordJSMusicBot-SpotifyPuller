@@ -345,8 +345,8 @@ function processVideoList(guildID, data, inp) {
     }, 0);
   
 
-  downloadData(guildID, songlist, 0, [startDelay, songoffset], () => {//download music and if it does not work try the next one in list
-    downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset], () => {//try unmatching music
+  downloadData(guildID, songlist, 0, [startDelay, songoffset], function() {//download music and if it does not work try the next one in list
+    downloadData(guildID, unbiasedsonglist, 0, [startDelay, songoffset], function() {//try unmatching music
       console.log("unmatched length song found");//no music found
     });
   });
@@ -420,9 +420,6 @@ function downloadData(guildID, matchsongs, index, inp, unsuccessful) {
 }
 
 async function playStream(guildID, ready) {
-  if(data.broadcast!=null){
-    data.broadcast.end();
-  }
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -431,6 +428,9 @@ async function playStream(guildID, ready) {
 
   let data = sData[0];
   let settings = sData[1];
+  if(data.broadcast!=null){
+    data.broadcast.end();
+  }
   
   
   var song = data.songqueue.shift();
