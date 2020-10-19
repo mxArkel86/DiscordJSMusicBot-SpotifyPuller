@@ -19,6 +19,7 @@ const serverData = new Map();
 var token;
 var downloadUpdateInterval = 1;
 var songmaxdeviation=1;
+var deepDebug;
 
 
 const guildDataDef = {
@@ -41,6 +42,7 @@ function importSettings(file) {
     token = tree.token;
     downloadUpdateInterval = tree.downloadUpdateInterval;
     songmaxdeviation = tree.songmaxdeviation;
+    deepDebug = tree.deepDebug;
 
     for (var guild of tree.servers) {
       let guildSettings = tree.formats[guild.format];
@@ -284,6 +286,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   var songlength = (tEnd - tStart) / 1000;
   var songoffset = (tStart - dNow) / 1000;
 
+  if(deepDebug)
   console.log("user presence updated - [" + songname + "] - " + r);
 
   
@@ -295,11 +298,15 @@ client.on("presenceUpdate", async presenceEvtArgs => {
       return 1;
     }
     if (mainsonglist.length > 0) {
+      if(deepDebug)
       console.log(mainsonglist.length + "close matches");
       mainsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
     }
-    else
+    else{
+      if(deepDebug)
       console.log(backupsonglist.length + " unmatched songs found");
+    }
+      
   
       backupsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
   
@@ -325,11 +332,11 @@ function searchPage(page, guildID, songname, artist, songlength, successful){
   
 
   scrapeYt.search(settings.query.replace("$title", songname).replace("$artist", artist).replace(" ", "%20"), { type: "video", page:page}).then(videos => {
-    console.log(videos);
       var data = processVideoList(guildID, page, videos, songlength);//parse videos from search
       var return_ = data[0];
       
       if(return_ == 2){
+        if(deepDebug)
         console.log("page " + page + " failed");
         successful([], []);
       }else{
@@ -341,9 +348,11 @@ function searchPage(page, guildID, songname, artist, songlength, successful){
       }
       if(return_ == 1){
         successful(mainsonglist, backupsonglist);
+        if(deepDebug)
         console.log("page " + page + " successful but ended");
       }
       else{
+        if(deepDebug)
         console.log("page " + page +" does not satisfy");
           searchPage(page+1, guildID, songname, artist, songlength, function success(mainsonglist1, backupsonglist1){
             for(var song of mainsonglist1){
@@ -372,11 +381,13 @@ function processVideoList(guildID, page, videos, songlength) {
   var unbiasedsonglist = [];
 
   if(videos.length==0){
+    if(deepDebug)
     console.log("zero length data");
     return [2, 0, 0];
   }
 
   for (var i = 0; i < videos.length; i++) {//look through every video in request
+    if(deepDebug)
     console.log("checking video [" + page*10+ i + "]");
     let video = videos[i];
     var duration = 0;
@@ -445,13 +456,15 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
         delay_now = data.delay - delay;//difference between delays
       }
 
+      if(deepDebug){
       console.log('song play delay=' + delay + " [" + action + "]");
       console.log("queue adjustment delay=" + delay_now);
+      }
       setTimeout(playStream, delay_now, guildID);
     }
     data.stream.put(chunk);
   }).on("progress", (chunksize, val, total) => {
-    if (downloadUpdateInterval != 0) {
+    if (downloadUpdateInterval != 0 && deepDebug) {
       var percent = Math.floor(val * 100 / total);
       var percent_2 = Math.floor(percent / downloadUpdateInterval);
       if (percent_2 != unique) {
@@ -460,12 +473,14 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
       }
     }
   }).on("error", (e) => {
+    if(deepDebug)
     console.log("song download failed. moving to next one [" + index + "+1]");
     downloadData(unsuccessful, guildID, r, matchsongs, index + 1, inp);
   });
 }
 
 async function playStream(guildID) {
+  if(deepDebug)
   console.log('play stream');
   let sData = serverData[guildID];
   if (!sData) {
@@ -477,9 +492,12 @@ async function playStream(guildID) {
   let settings = sData[1];
 
   var song = data.songqueue.shift();
+  if(song==undefined)
+  return;
   var dispatcher = data.connection.play(data.stream);
   dispatcher.on('start', ()=>{
-    data.textChannel.send(`Start playing: **${song.title} by ${song.artist}**`);
+    data.textChannel.send(`Started playing: **${song.title} by ${song.artist}**`);
+    console.log(`Playing: ${song.title} by ${song.artist}`);
     data.playing = true;
   });
   dispatcher.on('error', (e)=>{

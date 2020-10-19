@@ -2,6 +2,7 @@
     "token":"",
     "downloadUpdateInterval":5,
     "songmaxdeviation":2,
+    "deepDebug": false,
     "formats":
     [
         {

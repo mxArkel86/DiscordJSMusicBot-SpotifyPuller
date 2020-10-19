@@ -33,6 +33,9 @@ Distributions allowed on the *Open Source Lisence*
 <pre>
 {  <br>
     "token":"",  #the token of the discord bot <br>
+    "downloadUpdateInterval": 1, #how often the console will be pinged with download messages (0 = none)
+    "songmaxdeviation": 2, #the amount of seconds off a song on youtube must be for it to be considered a good match
+    "deepDebug": false, #the debugging level (true=all debug messages / false=surface level debugging)
     "formats": #the different formats that the servers might have decided to go for <br> 
     [  <br>
         {  <br>
