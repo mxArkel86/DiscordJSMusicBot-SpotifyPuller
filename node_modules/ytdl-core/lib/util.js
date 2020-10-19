@@ -83,6 +83,9 @@ exports.sortFormats = (a, b) => {
  */
 exports.chooseFormat = (formats, options) => {
   if (typeof options.format === 'object') {
+    if (!options.format.url) {
+      throw Error('Invalid format given, did you use `ytdl.getInfo()`?');
+    }
     return options.format;
   }
 
@@ -173,6 +176,7 @@ const sortFormatsSimple = (formats, audioOnly = false) => formats.sort((a, b) =>
 exports.filterFormats = (formats, filter) => {
   let fn;
   switch (filter) {
+    case 'videoandaudio':
     case 'audioandvideo':
       fn = format => format.hasVideo && format.hasAudio;
       break;
@@ -213,9 +217,17 @@ exports.filterFormats = (formats, filter) => {
  * @returns {string}
  */
 exports.between = (haystack, left, right) => {
-  let pos = haystack.indexOf(left);
-  if (pos === -1) { return ''; }
-  haystack = haystack.slice(pos + left.length);
+  let pos;
+  if (left instanceof RegExp) {
+    const match = haystack.match(left);
+    if (!match) { return ''; }
+    pos = match.index + match[0].length;
+  } else {
+    pos = haystack.indexOf(left);
+    if (pos === -1) { return ''; }
+    pos += left.length;
+  }
+  haystack = haystack.slice(pos);
   pos = haystack.indexOf(right);
   if (pos === -1) { return ''; }
   haystack = haystack.slice(0, pos);
@@ -371,8 +383,8 @@ exports.parseAbbreviatedNumber = string => {
   if (match) {
     let [, num, multi] = match;
     num = parseFloat(num);
-    return multi === 'M' ? num * 1000000 :
-      multi === 'K' ? num * 1000 : num;
+    return Math.round(multi === 'M' ? num * 1000000 :
+      multi === 'K' ? num * 1000 : num);
   }
   return null;
 };

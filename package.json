@@ -90,6 +90,7 @@
       "resolved": "https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
       "version": "1.0.1"
     },
+    "scrape-yt": "^1.4.3",
     "stream-buffers": "^3.0.2",
     "string-color": {
       "integrity": "sha1-HmdMgpXOKd3Zd4tuTLOqXnVEhAM=",
@@ -101,6 +102,7 @@
       "resolved": "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz",
       "version": "1.0.2"
     },
+    "youtube-scrape": "github:HermanFassett/youtube-scrape",
     "ytdl-core": "^3.4.1"
   }
 }

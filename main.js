@@ -1,4 +1,4 @@
-
+const scrapeYt = require("scrape-yt");
 //#region Imports
 const Discord = require("discord.js");
 const http = require('http');
@@ -18,6 +18,7 @@ const { UV_FS_O_FILEMAP } = require("constants");
 const serverData = new Map();
 var token;
 var downloadUpdateInterval = 1;
+var songmaxdeviation=1;
 
 
 const guildDataDef = {
@@ -39,6 +40,7 @@ function importSettings(file) {
 
     token = tree.token;
     downloadUpdateInterval = tree.downloadUpdateInterval;
+    songmaxdeviation = tree.songmaxdeviation;
 
     for (var guild of tree.servers) {
       let guildSettings = tree.formats[guild.format];
@@ -284,80 +286,119 @@ client.on("presenceUpdate", async presenceEvtArgs => {
 
   console.log("user presence updated - [" + songname + "] - " + r);
 
-
-  http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + settings.query.replace("$title", songname).replace("$artist", artist) + "&page=1", function (res) {
-    let data1 = ''
-
-    res.on('data', function (stream) {
-      data1 += stream;
-    });
-    res.on('end', function () {
-      processVideoList(guildID, r, data1, [songname, artist, dNow, songlength, songoffset]);//parse videos from search
-    });
+  
+  
+  searchPage(0, guildID, songname, artist, songlength, function successful(mainsonglist, backupsonglist){
+    
+    if(r!=data.songhandler){
+      data.songqueue.shift();
+      return 1;
+    }
+    if (mainsonglist.length > 0) {
+      console.log(mainsonglist.length + "close matches");
+      mainsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
+    }
+    else
+      console.log(backupsonglist.length + " unmatched songs found");
+  
+      backupsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
+  
+    downloadData(() => {
+      downloadData(() => {
+        console.log("no song able to be played");//no music found
+      }, guildID, r, backupsonglist, 0, dNow);
+    }, guildID, r, mainsonglist, 0, dNow);
   });
 });
 
-function processVideoList(guildID, r, data1, inp) {
+function searchPage(page, guildID, songname, artist, songlength, successful){
+  var mainsonglist = [];
+  var backupsonglist = [];
+
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
   }
   let settings = sData[1];
-  let data = sData[0];
-  //get input parameters
-  songname = inp[0];
-  artist = inp[1];
-  startDelay = inp[2];
-  songlength = inp[3];
-  songoffset = inp[4];
-  json_data = JSON.parse(data1);
 
+  
+
+  scrapeYt.search(settings.query.replace("$title", songname).replace("$artist", artist).replace(" ", "%20"), { type: "video", page:page}).then(videos => {
+    console.log(videos);
+      var data = processVideoList(guildID, page, videos, songlength);//parse videos from search
+      var return_ = data[0];
+      
+      if(return_ == 2){
+        console.log("page " + page + " failed");
+        successful([], []);
+      }else{
+      for(var song of data[1]){
+        mainsonglist.push(song);
+      }
+      for(var song of data[2]){
+        backupsonglist.push(song);
+      }
+      if(return_ == 1){
+        successful(mainsonglist, backupsonglist);
+        console.log("page " + page + " successful but ended");
+      }
+      else{
+        console.log("page " + page +" does not satisfy");
+          searchPage(page+1, guildID, songname, artist, songlength, function success(mainsonglist1, backupsonglist1){
+            for(var song of mainsonglist1){
+              mainsonglist.push(song);
+            }
+            for(var song of backupsonglist1){
+              backupsonglist.push(song);
+            }
+          successful(mainsonglist, backupsonglist);
+        });
+      }
+    }
+    });
+  }
+
+function processVideoList(guildID, page, videos, songlength) {
+  let sData = serverData[guildID];
+  if (!sData) {
+    console.log(ERROR.errorcode_1(guildID));
+    return;
+  }
+  let settings = sData[1];
+  //get input parameters
 
   var songlist = [];
   var unbiasedsonglist = [];
 
-  for (var i = 0; i < json_data.results.length; i++) {//look through every video in request
-    console.log("checking video [" + i + "]");
-    let video = json_data.results[i].video;
+  if(videos.length==0){
+    console.log("zero length data");
+    return [2, 0, 0];
+  }
+
+  for (var i = 0; i < videos.length; i++) {//look through every video in request
+    console.log("checking video [" + page*10+ i + "]");
+    let video = videos[i];
     var duration = 0;
     if (video != undefined) {
-      let dur = video.duration;
-      duration = (parseInt(dur.split(':')[0]) * 60 + parseInt(dur.split(':')[1]));
+      duration = video.duration;
       var videosong = {
-        url: video.url,
-        match: Math.abs(songlength - duration) < 2,
+        id: video.id,
+        match: Math.abs(songlength - duration) < songmaxdeviation,
         lengthdeviation: Math.abs(songlength - duration)
       }
       if (videosong.match)//if song is close in length, add to "similar" list
         songlist.push(videosong);
       else
         unbiasedsonglist.push(videosong);//if song is not close in length, add to "unbiased" list
-      if (songlist.length > settings.max_backup_searches)
-        break;
+      if (songlist.length + unbiasedsonglist.length + page*10 > settings.max_backup_searches)
+        return [1, songlist, unbiasedsonglist];
     }
   }
-  if(r!=data.songhandler){
-    data.songqueue.shift();
-    return;
-  }
-  if (songlist.length > 0) {
-    console.log(songlist.length + " matches   maxBackupSearches=[" + settings.max_backup_searches + "]");
-    songlist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
-  }
-  else
-    console.log(unbiasedsonglist.length + " unmatched songs found");
-
-  unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
-
-  downloadData(() => {
-    downloadData(() => {
-      console.log("unmatched length song found");//no music found
-    }, guildID, r, unbiasedsonglist, 0, [startDelay, songoffset]);
-  }, guildID, r, songlist, 0, [startDelay, songoffset]);
+  return [0, songlist, unbiasedsonglist];
 }
 
-function downloadData(unsuccessful, guildID, r, matchsongs, index, inp) {
+function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -365,8 +406,6 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, inp) {
   }
 
   let data = sData[0];
-  startdelay = inp[0];
-  songoffset = inp[1];
 
   if (index == matchsongs.length) {//if there is no song in the index position (out of range exception)
     unsuccessful(guildID);//leave with exception
@@ -377,7 +416,7 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, inp) {
   var unique = 0;
   var firstchunk = 1;
   
-  ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
+  ytdl("youtube.com/watch?v=" + song.id, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
     if(r!=data.songhandler){
       data.songqueue.shift();
       return;
@@ -393,7 +432,7 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, inp) {
         data.playing = false;
       });
       firstchunk = 0;
-      var delay = Date.now() - startDelay;
+      var delay = Date.now() - start;
       var action = 0;
       var delay_now = data.delay;
 
