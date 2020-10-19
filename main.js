@@ -28,6 +28,7 @@ const guildDataDef = {
   userID: null,
   playing: false,
   delay: 0,
+  songhandler: -1,
   stream: null,
   dispatcher: null
 };
@@ -249,7 +250,6 @@ client.on("presenceUpdate", async presenceEvtArgs => {
     var name = a.name;
     if (name != "Spotify")//if one of the activities is spotify
       continue;
-
     found = true;
     activity = a;
     break;
@@ -264,9 +264,16 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   //check if song is already playing
   if (data.songqueue.find(s => s.title == songname) != null)
     return;
+  
+  var r;
+  while((r=Math.round(Math.random()*999))==data.songhandler){
+
+  }
+  data.songhandler = r;
   const song = {
     title: songname,
-    artist: artist
+    artist: artist,
+    id: r
   };
   //add song to queue
   data.songqueue.push(song);
@@ -275,7 +282,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   var songlength = (tEnd - tStart) / 1000;
   var songoffset = (tStart - dNow) / 1000;
 
-  console.log("user presence updated");
+  console.log("user presence updated - [" + songname + "] - " + r);
 
 
   http.get("http://youtube-scrape.herokuapp.com/api/search?q=" + settings.query.replace("$title", songname).replace("$artist", artist) + "&page=1", function (res) {
@@ -285,25 +292,26 @@ client.on("presenceUpdate", async presenceEvtArgs => {
       data1 += stream;
     });
     res.on('end', function () {
-      processVideoList(guildID, data1, [songname, artist, dNow, songlength, songoffset]);//parse videos from search
+      processVideoList(guildID, r, data1, [songname, artist, dNow, songlength, songoffset]);//parse videos from search
     });
   });
 });
 
-function processVideoList(guildID, data, inp) {
+function processVideoList(guildID, r, data1, inp) {
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
     return;
   }
   let settings = sData[1];
+  let data = sData[0];
   //get input parameters
   songname = inp[0];
   artist = inp[1];
   startDelay = inp[2];
   songlength = inp[3];
   songoffset = inp[4];
-  json_data = JSON.parse(data);
+  json_data = JSON.parse(data1);
 
 
   var songlist = [];
@@ -329,6 +337,10 @@ function processVideoList(guildID, data, inp) {
         break;
     }
   }
+  if(r!=data.songhandler){
+    data.songqueue.shift();
+    return;
+  }
   if (songlist.length > 0) {
     console.log(songlist.length + " matches   maxBackupSearches=[" + settings.max_backup_searches + "]");
     songlist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
@@ -336,18 +348,16 @@ function processVideoList(guildID, data, inp) {
   else
     console.log(unbiasedsonglist.length + " unmatched songs found");
 
-  setTimeout(() => {
-    unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
-  }, 0);
+  unbiasedsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
 
   downloadData(() => {
     downloadData(() => {
       console.log("unmatched length song found");//no music found
-    }, guildID, unbiasedsonglist, 0, [startDelay, songoffset]);
-  }, guildID, songlist, 0, [startDelay, songoffset]);
+    }, guildID, r, unbiasedsonglist, 0, [startDelay, songoffset]);
+  }, guildID, r, songlist, 0, [startDelay, songoffset]);
 }
 
-function downloadData(unsuccessful, guildID, matchsongs, index, inp) {
+function downloadData(unsuccessful, guildID, r, matchsongs, index, inp) {
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -355,7 +365,6 @@ function downloadData(unsuccessful, guildID, matchsongs, index, inp) {
   }
 
   let data = sData[0];
-
   startdelay = inp[0];
   songoffset = inp[1];
 
@@ -367,11 +376,12 @@ function downloadData(unsuccessful, guildID, matchsongs, index, inp) {
 
   var unique = 0;
   var firstchunk = 1;
-
   
   ytdl(song.url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
-    
-
+    if(r!=data.songhandler){
+      data.songqueue.shift();
+      return;
+    }
     if (firstchunk == 1) {
       if(data.stream!=null)
       data.stream.destroy();
@@ -412,7 +422,7 @@ function downloadData(unsuccessful, guildID, matchsongs, index, inp) {
     }
   }).on("error", (e) => {
     console.log("song download failed. moving to next one [" + index + "+1]");
-    downloadData(unsuccessful, guildID, matchsongs, index + 1, inp);
+    downloadData(unsuccessful, guildID, r, matchsongs, index + 1, inp);
   });
 }
 
