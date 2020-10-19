@@ -1,7 +1,7 @@
 # DiscordMusicBot
 
 <h2>A discord music bot that grabs the spotify status present in discord to play the song you are currently listening to</h2>
-
+Distributions allowed on the *Open Source Lisence*
 ---------------------------------------------------
 <h4>The bot is a work in progress project built for nodejs with the discord.js library to allow access to the discord api</h4>
 
