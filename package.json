@@ -77,6 +77,7 @@
       "resolved": "https://registry.npmjs.org/mootools/-/mootools-1.5.2.tgz",
       "version": "1.5.2"
     },
+    "node-opus": "^0.3.3",
     "once": {
       "integrity": "sha1-WDsap3WWHUsROsF9nFC6753Xa9E=",
       "requires": {
