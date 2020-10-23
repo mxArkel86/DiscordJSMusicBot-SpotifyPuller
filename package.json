@@ -104,6 +104,6 @@
       "version": "1.0.2"
     },
     "youtube-scrape": "github:HermanFassett/youtube-scrape",
-    "ytdl-core": "^3.4.1"
+    "ytdl-core": "^3.4.2"
   }
 }
