@@ -4,7 +4,7 @@
 <p>Spotify Premium Listen Together Discord Bot Edition (With Delay)</p>
 <p>Distributions allowed on the *Open Source Lisence*</p>
 ---------------------------------------------------
-<h4>The bot is a work in progress project built for nodejs with the <i>discord.js library, ytdl library, and youtube scraper library</i> to allow access to the discord api</h4>
+<h4>The bot is a work in progress project built for nodejs with the <i>discord.js library, ytdl library, and youtube scraper library</i></h4>
 
 
 <br><h2>Initial setup:</h2>
@@ -20,11 +20,11 @@
 <h2>Breakdown</h2>
 <span>The bot goes through the same process whenever it decides to play a song:<br></span><br>
 <p>
-    waits for the status of a user to change<br>
-    checks parameters to make sure the user is the right one and no errors may run<br>
-    grabs a list of songs from youtube using a search query defined by the status of the user and formatted by the config file<br>
-    attempts to download a song using ytdl-core, and switching to a backup song if an error occurs<br>
-    plays the song when the first byte is received<br></p>
+    1). waits for the status of a user to change<br>
+    2). checks parameters to make sure the user is the right one and no errors may run<br>
+    3). grabs a list of songs from youtube using a search query defined by the status of the user and formatted by the config file<br>
+    4). attempts to download a song using ytdl-core, and switching to a backup song if an error occurs<br>
+    5). plays the song when the first byte is received<br></p>
     <span>By going through this process, song delay between detection and playing is minimized up to the limitations of the user's network capabilities and processing speeds of subpackages like ytdl-core
 </span><br><br>
 
