@@ -1,19 +1,11 @@
 const scrapeYt = require("scrape-yt");
 //#region Imports
 const Discord = require("discord.js");
-const http = require('http');
 const fs = require('fs')
 const ERROR = require('./errorcodes.js')
 var streamBuffers = require('stream-buffers');
 const ytdl = require("ytdl-core");
-const { Console, time } = require("console");
-const { filterFormats } = require("ytdl-core");
-const { formatWithOptions } = require("util");
-const { exit } = require("process");
-const stream = require('stream');
-const { addFormatMeta } = require("ytdl-core/lib/util");
 const { setTimeout } = require("timers");
-const { UV_FS_O_FILEMAP } = require("constants");
 ////#endregion
 const serverData = new Map();
 var token;
@@ -55,14 +47,6 @@ function importSettings(file) {
 
   //dSet(guildID, guildPrefab);
 }
-if (fs.existsSync('./configOverride.json')) {
-  importSettings("./configOverride.json");
-}
-else {
-  importSettings("./config.json");
-}
-console.log("loaded config");
-
 //static objects
 const client = new Discord.Client();
 
@@ -82,6 +66,10 @@ client.once("disconnect", () => {
 });
 
 client.on("error", (e) => {
+  console.error(e);
+});
+
+client.on("debug", (e) => {
   console.log(e);
 });
 
@@ -114,6 +102,8 @@ async function linkUser(data, user, voicechannel) {
 
 //on message recieved
 client.on("message", async message => {
+  if(deepDebug)
+    console.log("message received");
   //checking if server data does exist
   var currentuser = message.guild.member(message.author.id);
 
@@ -198,6 +188,8 @@ client.on("message", async message => {
 });
 
 client.on("voiceStateUpdate", async (oldMember, newMember) => {
+  if(deepDebug)
+    console.log("voice state updated");
   let oldUserChannel = oldMember.channel;
   let newUserChannel = newMember.channel;
 
@@ -229,6 +221,8 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 });
 
 client.on("presenceUpdate", async presenceEvtArgs => {
+  if(deepDebug)
+    console.log("presence updated");
   var dNow = Date.now();
   if (presenceEvtArgs === undefined)
     return;
@@ -507,5 +501,12 @@ async function playStream(guildID) {
   data.dispatcher = dispatcher;
 }
 
-
-
+if (fs.existsSync('./configOverride.json')) {
+  console.log("reading override config");
+  importSettings("./configOverride.json");
+}
+else {
+  console.log("reading default config");
+  importSettings("./config.json");
+}
+console.log("loaded config");
