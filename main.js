@@ -11,7 +11,7 @@ const serverData = new Map();
 var token;
 var downloadUpdateInterval = 1;
 var songmaxdeviation=1;
-var deepDebug;
+var deepDebug = false;
 
 
 const guildDataDef = {
@@ -48,8 +48,7 @@ function importSettings(file) {
   //dSet(guildID, guildPrefab);
 }
 //static objects
-const client = new Discord.Client();
-
+const client = new Discord.Client({ disableMentions: 'everyone', presence:true });
 
 //#region EventHandlers
 client.once("ready", () => {
@@ -70,7 +69,8 @@ client.on("error", (e) => {
 });
 
 client.on("debug", (e) => {
-  console.log(e);
+  if(deepDebug)
+    console.log(e);
 });
 
 //#endregion
