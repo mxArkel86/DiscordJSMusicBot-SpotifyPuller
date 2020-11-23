@@ -6,9 +6,9 @@
 ---------------------------------------------------
 <h4>The bot is a work in progress project built for nodejs with the <i>discord.js library, ytdl library, and youtube scraper library</i></h4>
 
-
 <br><h2>Initial setup:</h2>
-<span>Go into the config.json file and add your server id to 'server id placeholder', and your selected prefix into 'prefix placeholder'. If you do not know your server id, type </span><span><b>@serverid</b></span><span> in any text channel in your server and your id will be given</span>
+<span>Go into the config.json file and add your server id to 'server id placeholder', and your selected prefix into 'prefix placeholder'. If you do not know your server id, type <b>@serverid</b> in any text channel in your server and your id will be given. Furthermore, when setting up the bot, remember to enable its intents to gather user data and presence data. Both are required and steps are elaborated in the following article.</span>
+https://support.discord.com/hc/en-us/articles/360040720412#how-do-i-start-the-process
 
 ---------------------------------------------------
 <h2>Hint</h2>
