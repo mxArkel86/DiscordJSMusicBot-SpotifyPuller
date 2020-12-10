@@ -91,7 +91,7 @@
       "resolved": "https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
       "version": "1.0.1"
     },
-    "scrape-yt": "^1.4.6",
+    "scrape-yt": "^1.4.7",
     "stream-buffers": "^3.0.2",
     "string-color": {
       "integrity": "sha1-HmdMgpXOKd3Zd4tuTLOqXnVEhAM=",
