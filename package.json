@@ -2,7 +2,7 @@
   "requires": true,
   "lockfileVersion": 1,
   "dependencies": {
-    "@discordjs/opus": "^0.3.3",
+    "@discordjs/opus": "^0.4.0",
     "balanced-match": {
       "integrity": "sha1-ibTRmasr7kneFk6gK4nORi1xt2c=",
       "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-1.0.0.tgz",
