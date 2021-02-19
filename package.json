@@ -32,6 +32,8 @@
     },
     "discord": "^0.8.2",
     "discord.js": "^12.5.1",
+    "ffmpeg": "0.0.4",
+    "ffmpeg-static": "^4.2.7",
     "fs.realpath": {
       "integrity": "sha1-FQStJSMVjKpA20onh8sBQRmU6k8=",
       "resolved": "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz",

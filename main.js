@@ -10,7 +10,7 @@ const { setTimeout } = require("timers");
 const serverData = new Map();
 var token;
 var downloadUpdateInterval = 1;
-var songmaxdeviation=1;
+var songmaxdeviation = 1;
 var deepDebug = false;
 
 
@@ -48,7 +48,7 @@ function importSettings(file) {
   //dSet(guildID, guildPrefab);
 }
 //static objects
-const client = new Discord.Client({ disableMentions: 'everyone', presence:true });
+const client = new Discord.Client({ disableMentions: 'everyone', presence: true });
 
 //#region EventHandlers
 client.once("ready", () => {
@@ -69,7 +69,7 @@ client.on("error", (e) => {
 });
 
 client.on("debug", (e) => {
-  if(deepDebug)
+  if (deepDebug)
     console.log(e);
 });
 
@@ -102,12 +102,20 @@ async function linkUser(data, user, voicechannel) {
 
 //on message recieved
 client.on("message", async message => {
-  if(deepDebug)
+  if (deepDebug)
     console.log("message received");
   //checking if server data does exist
   var currentuser = message.guild.member(message.author.id);
 
   const guildID = message.guild.id;
+  //if message is not from a bot
+  if (message.author.bot) return;
+  //if message is truly a command
+  if (message.content == "@serverid") {
+    message.channel.send(message.guild.id);
+    return;
+  }
+
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -116,13 +124,6 @@ client.on("message", async message => {
   let settings = sData[1];
   let data = sData[0];
   var prefix = settings.prefix;
-  //if message is not from a bot
-  if (message.author.bot) return;
-  //if message is truly a command
-  if (message.content == "@serverid") {
-    message.channel.send(message.guild.id);
-    return;
-  }
 
   if (!message.content.startsWith(prefix)) return;
   //initialize voice channel
@@ -170,7 +171,13 @@ client.on("message", async message => {
     }
 
     return;
-  } else if (message.content == `${prefix}stop`) {
+  } else if (message.content == `${prefix}playing`) {
+    if (currentuser.voice.channel.id != data.voiceChannel.id) {
+      var song = data.songqueue[0];
+      message.channel.send(`Started playing: **${song.title} by ${song.artist}**`);
+    }
+  }
+  else if (message.content == `${prefix}stop`) {
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
       message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
@@ -188,7 +195,7 @@ client.on("message", async message => {
 });
 
 client.on("voiceStateUpdate", async (oldMember, newMember) => {
-  if(deepDebug)
+  if (deepDebug)
     console.log("voice state updated");
   let oldUserChannel = oldMember.channel;
   let newUserChannel = newMember.channel;
@@ -221,7 +228,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 });
 
 client.on("presenceUpdate", async presenceEvtArgs => {
-  if(deepDebug)
+  if (deepDebug)
     console.log("presence updated");
   var dNow = Date.now();
   if (presenceEvtArgs === undefined)
@@ -262,9 +269,9 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   //check if song is already playing
   if (data.songqueue.find(s => s.title == songname) != null)
     return;
-  
+
   var r;
-  while((r=Math.round(Math.random()*999))==data.songhandler){
+  while ((r = Math.round(Math.random() * 999)) == data.songhandler) {
 
   }
   data.songhandler = r;
@@ -278,32 +285,31 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   var tStart = Date.parse(timestamps.start);
   var tEnd = Date.parse(timestamps.end);
   var songlength = (tEnd - tStart) / 1000;
-  var songoffset = (tStart - dNow) / 1000;
+  //var songoffset = (tStart - dNow) / 1000;
 
-  if(deepDebug)
-  console.log("user presence updated - [" + songname + "] - " + r);
+  if (deepDebug)
+    console.log("user presence updated - [" + songname + "] - " + r);
 
-  
-  
-  searchPage(0, guildID, songname, artist, songlength, function successful(mainsonglist, backupsonglist){
-    
-    if(r!=data.songhandler){
+
+
+  searchPage(0, guildID, songname, artist, songlength, function successful(mainsonglist, backupsonglist) {
+
+    if (r != data.songhandler) {
       data.songqueue.shift();
       return 1;
     }
-    if (mainsonglist.length > 0) {
-      if(deepDebug)
-      console.log(mainsonglist.length + "close matches");
-      mainsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
-    }
-    else{
-      if(deepDebug)
+    if (deepDebug) {
       console.log(backupsonglist.length + " unmatched songs found");
+      console.log(mainsonglist.length + "close matches");
     }
-      
-  
-      backupsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
-  
+    if (mainsonglist.length > 0) {
+      if (deepDebug)
+        mainsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);//sort list starting with lowest deviation to highest
+    }
+
+
+    backupsonglist.sort((a, b) => (a.lengthdeviation > b.lengthdeviation) ? 1 : -1);
+
     downloadData(() => {
       downloadData(() => {
         console.log("no song able to be played");//no music found
@@ -312,7 +318,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   });
 });
 
-function searchPage(page, guildID, songname, artist, songlength, successful){
+function searchPage(page, guildID, songname, artist, songlength, successful) {
   var mainsonglist = [];
   var backupsonglist = [];
 
@@ -323,44 +329,44 @@ function searchPage(page, guildID, songname, artist, songlength, successful){
   }
   let settings = sData[1];
 
-  
 
-  scrapeYt.search(settings.query.replace("$title", songname).replace("$artist", artist).replace(" ", "%20"), { type: "video", page:page}).then(videos => {
-      var data = processVideoList(guildID, page, videos, songlength);//parse videos from search
-      var return_ = data[0];
-      
-      if(return_ == 2){
-        if(deepDebug)
+
+  scrapeYt.search(settings.query.replace("$title", songname).replace("$artist", artist).replace(" ", "%20"), { type: "video", page: page }).then(videos => {
+    var data = processVideoList(guildID, page, videos, songlength);//parse videos from search
+    var return_ = data[0];
+
+    if (return_ == 2) {
+      if (deepDebug)
         console.log("page " + page + " failed");
-        successful([], []);
-      }else{
-      for(var song of data[1]){
+      successful([], []);
+    } else {
+      for (var song of data[1]) {
         mainsonglist.push(song);
       }
-      for(var song of data[2]){
+      for (var song of data[2]) {
         backupsonglist.push(song);
       }
-      if(return_ == 1){
+      if (return_ == 1) {
         successful(mainsonglist, backupsonglist);
-        if(deepDebug)
-        console.log("page " + page + " successful but ended");
+        if (deepDebug)
+          console.log("page " + page + " successful but ended");
       }
-      else{
-        if(deepDebug)
-        console.log("page " + page +" does not satisfy");
-          searchPage(page+1, guildID, songname, artist, songlength, function success(mainsonglist1, backupsonglist1){
-            for(var song of mainsonglist1){
-              mainsonglist.push(song);
-            }
-            for(var song of backupsonglist1){
-              backupsonglist.push(song);
-            }
+      else {
+        if (deepDebug)
+          console.log("page " + page + " does not satisfy");
+        searchPage(page + 1, guildID, songname, artist, songlength, function success(mainsonglist1, backupsonglist1) {
+          for (var song of mainsonglist1) {
+            mainsonglist.push(song);
+          }
+          for (var song of backupsonglist1) {
+            backupsonglist.push(song);
+          }
           successful(mainsonglist, backupsonglist);
         });
       }
     }
-    });
-  }
+  });
+}
 
 function processVideoList(guildID, page, videos, songlength) {
   let sData = serverData[guildID];
@@ -374,15 +380,15 @@ function processVideoList(guildID, page, videos, songlength) {
   var songlist = [];
   var unbiasedsonglist = [];
 
-  if(videos.length==0){
-    if(deepDebug)
-    console.log("zero length data");
+  if (videos.length == 0) {
+    if (deepDebug)
+      console.log("zero length data");
     return [2, 0, 0];
   }
 
   for (var i = 0; i < videos.length; i++) {//look through every video in request
-    if(deepDebug)
-    console.log("checking video [" + page*10+ i + "]");
+    if (deepDebug)
+      console.log("checking video [" + page * 10 + i + "]");
     let video = videos[i];
     var duration = 0;
     if (video != undefined) {
@@ -396,7 +402,7 @@ function processVideoList(guildID, page, videos, songlength) {
         songlist.push(videosong);
       else
         unbiasedsonglist.push(videosong);//if song is not close in length, add to "unbiased" list
-      if (songlist.length + unbiasedsonglist.length + page*10 > settings.max_backup_searches)
+      if (songlist.length + unbiasedsonglist.length + page * 10 > settings.max_backup_searches)
         return [1, songlist, unbiasedsonglist];
     }
   }
@@ -420,20 +426,30 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
 
   var unique = 0;
   var firstchunk = 1;
-  
-  ytdl("youtube.com/watch?v=" + song.id, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
-    if(r!=data.songhandler){
+  var url = ("https://www.youtube.com/watch?v=" + song.id);
+  var urlvalid = ytdl.validateURL(url);
+  if (deepDebug) {
+    console.log(url);
+    console.log("url valid=" + urlvalid);
+    if (urlvalid == false) {
+      console.log("ytdl failed to recognize the video url");
+      return;
+    }
+  }
+
+  ytdl(url, { filter: 'audioonly' }).on("data", (chunk) => {//download music file
+    if (r != data.songhandler) {
       data.songqueue.shift();
       return;
     }
     if (firstchunk == 1) {
-      if(data.stream!=null)
-      data.stream.destroy();
+      if (data.stream != null)
+        data.stream.destroy();
       data.stream = new streamBuffers.ReadableStreamBuffer({
         frequency: 10,      // in milliseconds.
         chunkSize: 2048     // in bytes.
       });
-      data.stream.on('end', ()=>{
+      data.stream.on('end', () => {
         data.playing = false;
       });
       firstchunk = 0;
@@ -450,9 +466,9 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
         delay_now = data.delay - delay;//difference between delays
       }
 
-      if(deepDebug){
-      console.log('song play delay=' + delay + " [" + action + "]");
-      console.log("queue adjustment delay=" + delay_now);
+      if (deepDebug) {
+        console.log('song play delay=' + delay + " [" + action + "]");
+        console.log("queue adjustment delay=" + delay_now);
       }
       setTimeout(playStream, delay_now, guildID);
     }
@@ -467,15 +483,17 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
       }
     }
   }).on("error", (e) => {
-    if(deepDebug)
-    console.log("song download failed. moving to next one [" + index + "+1]");
-    downloadData(unsuccessful, guildID, r, matchsongs, index + 1, inp);
+    if (deepDebug) {
+      console.log("song download failed. moving to next one [" + index + "]");
+      console.error(e);
+    }
+    downloadData(unsuccessful, guildID, r, matchsongs, index + 1, start);
   });
 }
 
 async function playStream(guildID) {
-  if(deepDebug)
-  console.log('play stream');
+  if (deepDebug)
+    console.log('play stream');
   let sData = serverData[guildID];
   if (!sData) {
     console.log(ERROR.errorcode_1(guildID));
@@ -486,15 +504,15 @@ async function playStream(guildID) {
   let settings = sData[1];
 
   var song = data.songqueue.shift();
-  if(song==undefined)
-  return;
+  if (song == undefined)
+    return;
   var dispatcher = data.connection.play(data.stream);
-  dispatcher.on('start', ()=>{
-    data.textChannel.send(`Started playing: **${song.title} by ${song.artist}**`);
+  dispatcher.on('start', () => {
+    //data.textChannel.send(`Started playing: **${song.title} by ${song.artist}**`);
     console.log(`Playing: ${song.title} by ${song.artist}`);
     data.playing = true;
   });
-  dispatcher.on('error', (e)=>{
+  dispatcher.on('error', (e) => {
     console.log(e);
   });
   dispatcher.setVolume(settings.volume);
