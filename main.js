@@ -24,7 +24,8 @@ const guildDataDef = {
   delay: 0,
   songhandler: -1,
   stream: null,
-  dispatcher: null
+  dispatcher: null,
+  song: null
 };
 
 function importSettings(file) {
@@ -127,7 +128,6 @@ client.on("message", async message => {
 
   if (!message.content.startsWith(prefix)) return;
   //initialize voice channel
-
   if (message.content.startsWith(`${prefix}link`)) {
     data.textChannel = message.channel;
     var contentleng = message.content.split(' ').length;
@@ -173,9 +173,12 @@ client.on("message", async message => {
     return;
   } else if (message.content == `${prefix}playing`) {
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
-      var song = data.songqueue[0];
-      message.channel.send(`Started playing: **${song.title} by ${song.artist}**`);
+      message.channel.send(ERROR.errorcode_5(currentuser.displayName));
+      return;
     }
+    var song = data.song;
+    message.channel.send(`Started playing: **${song.title} by ${song.artist}**`);
+    return;
   }
   else if (message.content == `${prefix}stop`) {
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
@@ -504,16 +507,23 @@ async function playStream(guildID) {
   let settings = sData[1];
 
   var song = data.songqueue.shift();
+
   if (song == undefined)
     return;
+
+
   var dispatcher = data.connection.play(data.stream);
   dispatcher.on('start', () => {
     //data.textChannel.send(`Started playing: **${song.title} by ${song.artist}**`);
     console.log(`Playing: ${song.title} by ${song.artist}`);
+    data.song = song;
     data.playing = true;
   });
   dispatcher.on('error', (e) => {
     console.log(e);
+  });
+  dispatcher.on('end', (e) => {
+    data.song = null;
   });
   dispatcher.setVolume(settings.volume);
   data.dispatcher = dispatcher;

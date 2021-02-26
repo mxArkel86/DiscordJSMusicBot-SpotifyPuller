@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import { RequestOptions } from 'http';
+import { URL } from 'url';
 import { PassThrough, Transform } from 'stream';
 declare namespace Miniget {
     interface Options extends RequestOptions {
@@ -16,6 +17,15 @@ declare namespace Miniget {
             [key: string]: () => Transform;
         };
     }
+    interface DefaultOptions extends Options {
+        maxRedirects: number;
+        maxRetries: number;
+        maxReconnects: number;
+        backoff: {
+            inc: number;
+            max: number;
+        };
+    }
     type defaultOptions = Miniget.Options;
     type MinigetError = Error;
     interface Stream extends PassThrough {
@@ -30,7 +40,7 @@ declare namespace Miniget {
         on(event: string | symbol, listener: (...args: any) => void): this;
     }
 }
-declare function Miniget(url: string, options?: Miniget.Options): Miniget.Stream;
+declare function Miniget(url: string | URL, options?: Miniget.Options): Miniget.Stream;
 declare namespace Miniget {
     var defaultOptions: {
         maxRedirects: number;
@@ -42,14 +52,14 @@ declare namespace Miniget {
         };
     };
     var MinigetError: {
-        new (message: string, statusCode?: number): {
-            statusCode: number;
+        new (message: string, statusCode?: number | undefined): {
+            statusCode?: number | undefined;
             name: string;
             message: string;
-            stack?: string;
+            stack?: string | undefined;
         };
-        captureStackTrace(targetObject: object, constructorOpt?: Function): void;
-        prepareStackTrace?: (err: Error, stackTraces: NodeJS.CallSite[]) => any;
+        captureStackTrace(targetObject: object, constructorOpt?: Function | undefined): void;
+        prepareStackTrace?: ((err: Error, stackTraces: NodeJS.CallSite[]) => any) | undefined;
         stackTraceLimit: number;
     };
 }

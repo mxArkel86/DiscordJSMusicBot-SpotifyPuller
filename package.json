@@ -32,7 +32,6 @@
     },
     "discord": "^0.8.2",
     "discord.js": "^12.5.1",
-    "ffmpeg": "0.0.4",
     "ffmpeg-static": "^4.2.7",
     "fs.realpath": {
       "integrity": "sha1-FQStJSMVjKpA20onh8sBQRmU6k8=",
@@ -106,6 +105,7 @@
       "version": "1.0.2"
     },
     "youtube-scrape": "github:HermanFassett/youtube-scrape",
-    "ytdl-core": "^4.4.5"
+    "ytdl": "^1.4.1",
+    "ytdl-core": "^4.5.0"
   }
 }
