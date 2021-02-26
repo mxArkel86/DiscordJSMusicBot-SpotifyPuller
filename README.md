@@ -6,9 +6,12 @@
 ---------------------------------------------------
 <h4>The bot is a work in progress project built for nodejs with the <i>discord.js library, ytdl library, and youtube scraper library</i></h4>
 
-<br><h2>Initial setup:</h2>
+<br><h2>Initial System Setup:</h2>
+<span>In order to run the program (main.js), a javascript runtime must be installed to load the file. NodeJS is a particular favorite of mine, and is already set up for in this repo in the executable files <b>start.bat</b> and <b>start.sh</b>. The link to NodeJS is presented below. To run the program, run the previously mentioned executable file (.bat for windows and .sh for linux), or copy the command from within the respective file and run it in a console with its location set to the repository directory.</span>
+<h2>Server Setup:</h2>
 <span>Go into the config.json file and add your server id to 'server id placeholder', and your selected prefix into 'prefix placeholder'. If you do not know your server id, type <b>@serverid</b> in any text channel in your server and your id will be given. Furthermore, when setting up the bot, remember to enable its intents to gather user data and presence data. Both are required and steps are elaborated in the following article.</span>
 https://support.discord.com/hc/en-us/articles/360040720412#how-do-i-start-the-process
+https://nodejs.org/en/download/
 
 ---------------------------------------------------
 <h2>Hint</h2>
