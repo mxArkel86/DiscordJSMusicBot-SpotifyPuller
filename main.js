@@ -15,17 +15,18 @@ var deepDebug = false;
 
 
 const guildDataDef = {
-  textChannel: null,
-  voiceChannel: null,
-  connection: null,
-  songqueue: [],
-  userID: null,
-  playing: false,
-  delay: 0,
-  songhandler: -1,
-  stream: null,
-  dispatcher: null,
-  song: null
+  textChannel: null,//text channel where bot is linked
+  voiceChannel: null,//voice channel where bot is in
+  connection: null,//backend connection util
+  songqueue: [],//song queue per server
+  userID: null,//id of user that is linked
+  playing: false,//is song playing
+  delay: 0,//song delay (backend stuff)
+  songhandler: -1,//id of the song being played
+  stream: null,//song stream
+  dispatcher: null,//bot audio manager 
+  song: null,//song being played info
+  songprogress: 0//progress through the current song
 };
 
 function importSettings(file) {
@@ -70,8 +71,8 @@ client.on("error", (e) => {
 });
 
 client.on("debug", (e) => {
-  if (deepDebug)
-    console.log(e);
+  //if (deepDebug)
+    //console.log(e);
 });
 
 //#endregion
@@ -452,6 +453,11 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
         frequency: 10,      // in milliseconds.
         chunkSize: 2048     // in bytes.
       });
+      data.stream.on('data', (a)=>{
+        var percent = Math.round((data.stream.maxSize() - data.stream.size()) * 100/data.stream.maxSize());
+        //console.log("PROGRESS=" + percent);
+        data.songprogress = percent;
+      });
       data.stream.on('end', () => {
         data.playing = false;
       });
@@ -460,7 +466,7 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
       var action = 0;
       var delay_now = data.delay;
 
-      if (delay >= data.delay || data.playing) {//if new song delay >= old delay
+      if (delay >= data.delay || data.playing || data.songprogress>95) {//if new song delay >= old delay
         action = 1;
         data.delay = delay;//next delay is higher
         delay_now = 0;
