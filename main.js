@@ -18,15 +18,16 @@ const guildDataDef = {
   textChannel: null,//text channel where bot is linked
   voiceChannel: null,//voice channel where bot is in
   connection: null,//backend connection util
+  dispatcher: null,//bot audio manager 
   songqueue: [],//song queue per server
   userID: null,//id of user that is linked
   playing: false,//is song playing
   delay: 0,//song delay (backend stuff)
   songhandler: -1,//id of the song being played
   stream: null,//song stream
-  dispatcher: null,//bot audio manager 
   song: null,//song being played info
-  songprogress: 0//progress through the current song
+  songprogress: 0,//progress through the current song,
+  songmax: 0 //song length
 };
 
 function importSettings(file) {
@@ -170,18 +171,21 @@ client.on("message", async message => {
       }
       linkUser(data, currentuser, currentuser.voice.channel);
     }
-
-    return;
   } else if (message.content == `${prefix}playing`) {
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
       message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
     }
     var song = data.song;
-    message.channel.send(`Started playing: **${song.title} by ${song.artist}**`);
-    return;
-  }
-  else if (message.content == `${prefix}stop`) {
+    var progress = data.songprogress*10/data.songmax;
+    var str = ('#'.repeat(progress) + '-'.repeat(10-progress)).toString();
+    var minutes = Math.floor(data.songprogress/60);
+    var seconds = Math.round(data.songprogress - (minutes*60));
+    var minutes1 = Math.floor(data.songmax/60);
+    var seconds1 = data.songmax - (minutes1*60);
+    var str2 = str.substring(0, str.length/2) + ` ` + minutes + `:` + seconds + ` / ` + minutes1 + `:` + seconds1 + ` ` + str.substring(str.length/2);
+    message.channel.send(`Started playing: **${song.title} by ${song.artist}**\n[` + str2 + `]`);
+  }else if (message.content == `${prefix}stop`) {
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
       message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
@@ -189,10 +193,8 @@ client.on("message", async message => {
     client.voice.connections.get(guildID).disconnect();
     data = guildDataDef;
     message.channel.send('Bot disconnected from voice channel');
-    return;
-  } if (message.content == `${prefix}help`) {
+  }else if (message.content == `${prefix}help`) {
     writeHelpCommands(channel);
-    return;
   } else {
     message.channel.send("You need to enter a valid command!");
   }
@@ -282,7 +284,8 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   const song = {
     title: songname,
     artist: artist,
-    id: r
+    id: r,
+    length: 0
   };
   //add song to queue
   data.songqueue.push(song);
@@ -296,9 +299,9 @@ client.on("presenceUpdate", async presenceEvtArgs => {
 
 
 
-  searchPage(0, guildID, songname, artist, songlength, function successful(mainsonglist, backupsonglist) {
+  searchPage(0, guildID, songname, artist, songlength, r, function successful(mainsonglist, backupsonglist, r) {
 
-    if (r != data.songhandler) {
+    if (r != data.songhandler) {//song to be played switched during processing
       data.songqueue.shift();
       return 1;
     }
@@ -322,7 +325,7 @@ client.on("presenceUpdate", async presenceEvtArgs => {
   });
 });
 
-function searchPage(page, guildID, songname, artist, songlength, successful) {
+function searchPage(page, guildID, songname, artist, songlength, r, successful) {
   var mainsonglist = [];
   var backupsonglist = [];
 
@@ -342,7 +345,7 @@ function searchPage(page, guildID, songname, artist, songlength, successful) {
     if (return_ == 2) {
       if (deepDebug)
         console.log("page " + page + " failed");
-      successful([], []);
+      successful([], [], null);
     } else {
       for (var song of data[1]) {
         mainsonglist.push(song);
@@ -351,21 +354,21 @@ function searchPage(page, guildID, songname, artist, songlength, successful) {
         backupsonglist.push(song);
       }
       if (return_ == 1) {
-        successful(mainsonglist, backupsonglist);
+        successful(mainsonglist, backupsonglist, r);
         if (deepDebug)
           console.log("page " + page + " successful but ended");
       }
       else {
         if (deepDebug)
           console.log("page " + page + " does not satisfy");
-        searchPage(page + 1, guildID, songname, artist, songlength, function success(mainsonglist1, backupsonglist1) {
+        searchPage(page + 1, guildID, songname, artist, songlength, r, function success(mainsonglist1, backupsonglist1, r) {
           for (var song of mainsonglist1) {
             mainsonglist.push(song);
           }
           for (var song of backupsonglist1) {
             backupsonglist.push(song);
           }
-          successful(mainsonglist, backupsonglist);
+          successful(mainsonglist, backupsonglist, r);
         });
       }
     }
@@ -400,7 +403,8 @@ function processVideoList(guildID, page, videos, songlength) {
       var videosong = {
         id: video.id,
         match: Math.abs(songlength - duration) < songmaxdeviation,
-        lengthdeviation: Math.abs(songlength - duration)
+        lengthdeviation: Math.abs(songlength - duration),
+        length: duration
       }
       if (videosong.match)//if song is close in length, add to "similar" list
         songlist.push(videosong);
@@ -453,10 +457,11 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
         frequency: 10,      // in milliseconds.
         chunkSize: 2048     // in bytes.
       });
+      data.songmax = song.length;
       data.stream.on('data', (a)=>{
-        var percent = Math.round((data.stream.maxSize() - data.stream.size()) * 100/data.stream.maxSize());
+        var percent = Math.round();
         //console.log("PROGRESS=" + percent);
-        data.songprogress = percent;
+        data.songprogress = (data.stream.maxSize() - data.stream.size()) * song.length/data.stream.maxSize();
       });
       data.stream.on('end', () => {
         data.playing = false;
