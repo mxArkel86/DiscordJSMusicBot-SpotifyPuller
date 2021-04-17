@@ -135,7 +135,12 @@ client.on("message", async message => {
     var contentleng = message.content.split(' ').length;
     //if message contains a second parameter
     if (contentleng > 1) {
-      var username_ = message.content.split(' ')[1].toLowerCase();
+      var str_list = message.content.split(' ')
+      str_list.shift()
+      if (str_list[str_list.length-1] == "here"){
+        str_list.splice(-1,1)
+      }
+      var username_ = str_list.join(" ").toLowerCase();
       //fetch user in guild by username
       var userlist = await message.guild.members.fetch({});
       for (var uobj of userlist) {
