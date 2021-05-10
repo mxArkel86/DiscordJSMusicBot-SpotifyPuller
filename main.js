@@ -130,36 +130,46 @@ client.on("message", async message => {
 
   if (!message.content.startsWith(prefix)) return;
   //initialize voice channel
+  var contentleng = message.content.split(' ').length;
   if (message.content.startsWith(`${prefix}link`)) {
     data.textChannel = message.channel;
-    var contentleng = message.content.split(' ').length;
     //if message contains a second parameter
     if (contentleng > 1) {
-      var username_ = message.content.split(' ')[1].toLowerCase();
+      var username_ = message.split(' ').slice(1).join(' ');
       //fetch user in guild by username
+      var user_ = null;
       var userlist = await message.guild.members.fetch({});
       for (var uobj of userlist) {
         var u = uobj[1];
-        if (u.displayName.toLowerCase() == username_) {
-          var voicechann = u.voice.channel;
-          if (contentleng > 2) {
-            if (message.content.split(' ')[2] == 'here') {
-              voicechann = currentuser.voice;
-              if (voicechann == null) {
-                data.textChannel.send(ERROR.errorcode_3(u.displayName));
-                return;
-              }
-            }
-          } else {
-            if (voicechann == null) {
-              data.textChannel.send(ERROR.errorcode_3(u.displayName));
-              return;
-            }
+        if (u.displayName.toLowerCase().startsWith(username_)) {
+          if(user_ != null){
+            data.textChannel.send(ERROR.errorcode_6(username_));
+            return;
           }
-
-          linkUser(data, u, voicechann);
+          user_ = u;
+          
           return;
         }
+      }
+      if(user_==null){
+        data.textChannel.send(ERROR.errorcode_2(username_));
+      }else{
+          var voicechann = user_.voice.channel;
+          
+          var curusr_voicechann = currentuser.voice.channel;
+          if (voicechann == null) {
+            data.textChannel.send(ERROR.errorcode_3(u.displayName));
+            return;
+          }
+          if (curusr_voicechann == null) {
+            data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
+            return;
+          }
+          if(curusr_voicechann.id != voicechann.id){
+            data.textChannel.send(ERROR.errorcode_7());
+            return;
+          }
+          linkUser(data, u, voicechann);
       }
       data.textChannel.send(ERROR.errorcode_2(username_));
       return;
