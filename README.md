@@ -2,7 +2,7 @@
 
 <h2>A discord music bot that grabs the spotify status present in discord to play the song you are currently listening to</h2>
 <p>Spotify Premium Listen Together Discord Bot Edition (With Delay)</p>
-<p>Distributions allowed on the *Open Source Lisence*</p>
+<p>Distributions allowed on the *Open Source License*</p>
 ---------------------------------------------------
 <h4>The bot is a work in progress project built for nodejs with the <i>discord.js library, ytdl library, and youtube scraper library</i></h4>
 

@@ -78,7 +78,12 @@ client.on("debug", (e) => {
 
 //#endregion
 function init() {
+  try{
   client.login(token);
+  }catch(e){
+    console.error(e);
+    console.log("failed to initialize client. most likely an invalid token")
+  }
 }
 
 function writeHelpCommands(channel) {
@@ -135,20 +140,19 @@ client.on("message", async message => {
     data.textChannel = message.channel;
     //if message contains a second parameter
     if (contentleng > 1) {
-      var username_ = message.split(' ').slice(1).join(' ');
+      var username_ = message.content.split(' ').slice(1).join(' ');
       //fetch user in guild by username
       var user_ = null;
       var userlist = await message.guild.members.fetch({});
       for (var uobj of userlist) {
         var u = uobj[1];
-        if (u.displayName.toLowerCase().startsWith(username_)) {
+        if (u.displayName.toLowerCase().startsWith(username_.toLowerCase())) {
           if(user_ != null){
             data.textChannel.send(ERROR.errorcode_6(username_));
             return;
           }
           user_ = u;
-          
-          return;
+          break;
         }
       }
       if(user_==null){
@@ -171,8 +175,6 @@ client.on("message", async message => {
           }
           linkUser(data, u, voicechann);
       }
-      data.textChannel.send(ERROR.errorcode_2(username_));
-      return;
     } else {
       //link to user and clear song queue
       if (currentuser.voice.channel == null) {
@@ -195,7 +197,7 @@ client.on("message", async message => {
     var seconds1 = data.songmax - (minutes1*60);
     var str2 = str.substring(0, str.length/2) + ` ` + minutes + `:` + seconds + ` / ` + minutes1 + `:` + seconds1 + ` ` + str.substring(str.length/2);
     message.channel.send(`Started playing: **${song.title} by ${song.artist}**\n[` + str2 + `]`);
-  }else if (message.content == `${prefix}stop`) {
+  }else if (message.content == `${prefix}unlink`) {
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
       message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
@@ -447,7 +449,6 @@ function downloadData(unsuccessful, guildID, r, matchsongs, index, start) {
   var url = ("https://www.youtube.com/watch?v=" + song.id);
   var urlvalid = ytdl.validateURL(url);
   if (deepDebug) {
-    console.log(url);
     console.log("url valid=" + urlvalid);
     if (urlvalid == false) {
       console.log("ytdl failed to recognize the video url");
