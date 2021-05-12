@@ -14,7 +14,7 @@
         {
             "prefix":"-",
             "max_backup_searches": 5,
-            "volume": 5,
+            "volume": 2,
             "query": "$title by $artist"
         }
     ],

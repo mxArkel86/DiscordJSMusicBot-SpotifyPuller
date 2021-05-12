@@ -7,6 +7,7 @@ module.exports = {
       serverblacklst.push(x);
       return flag + "A configuration is missing for the discord server " + x + '. If this is your first time running the server, please consider adding the server to the config file as mentioned in ./README.md';
     }
+    return "";
   },
   errorcode_2: function (x) {
     return flag + "A user by the query string \"" + x + "\" could not be found in your channel";
