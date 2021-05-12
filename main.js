@@ -221,7 +221,7 @@ client.on("message", async (message) => {
     data = guildDataDef;
     message.channel.send("Bot disconnected from voice channel");
   } else if (message.content == `${prefix}help`) {
-    writeHelpCommands(channel);
+    writeHelpCommands(message.channel);
   } else {
     message.channel.send("You need to enter a valid command!");
   }
