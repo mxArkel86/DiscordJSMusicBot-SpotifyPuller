@@ -1,21 +1,21 @@
-
+//package imports
 const Discord = require("discord.js");
 const fs = require("fs");
 //file imports
 const ERROR = require("./errorcodes.js");
 const UTIL = require("./util.js");
 const DWNLD = require("./download.js");
-////#endregion
 
 
 
-//static objects
+//initialize discord client object
 const client = new Discord.Client({
   disableMentions: "everyone",
   presence: true,
 });
 
-//#region EventHandlers
+//#region BASIC EventHandlers
+//basic event handlers involved with general functioning
 client.once("ready", () => {
   console.log("ready");
 });
@@ -29,24 +29,27 @@ client.once("disconnect", () => {
 });
 
 client.on("error", (e) => {
-  console.error(e);
+  console.error("[ERROR]: " + e);
 });
 
 client.on("debug", (e) => {
-  //if (UTIL.gconfig.deepDebug)
-  //console.log(e);
+  if (UTIL.gconfig.deepDebug)
+  console.log(e);
 });
-
 //#endregion
+
+//initialize bot with token
 function init() {
   try {
     client.login(UTIL.gconfig.token);
   } catch (e) {
-    console.error(e);
+    console.error("[ERROR]: " + e);
     console.log("failed to initialize client. most likely an invalid token");
   }
 }
 
+// set a user and voice channel
+// for the bot to consider
 async function linkUser(data, user, voicechannel) {
   data.userID = user.id;
   data.songs = [];
@@ -62,58 +65,76 @@ async function linkUser(data, user, voicechannel) {
   );
 }
 
-//on message recieved
+//#region ADVANCED EVENTHANDLERS
+//when a message is received in any server
 client.on("message", async (message) => {
-  if (UTIL.gconfig.deepDebug) console.log("message received");
-  //checking if server data does exist
+  //get basic message and server info
   var currentuser = message.guild.member(message.author.id);
-
   const guildID = message.guild.id;
-  //if message is not from a bot
+  
+  //if the message author is a bot, skip everything
   if (message.author.bot) return;
-  //if message is truly a command
+
+  //log event
+  if (UTIL.gconfig.deepDebug) console.log("message received");
+
+  //if message is @serverid, send guild id and return
   if (message.content == "@serverid") {
     message.channel.send(message.guild.id);
     return;
   }
+
+  //get data associated with guild
   let sData = UTIL.GetData(guildID);
-  if (sData == null) return;
+  if (sData == null) return;//return if it doesn't exist
   let settings = sData[1];
   let data = sData[0];
   var prefix = settings.prefix;
 
+  //check if message is a command
   if (!message.content.startsWith(prefix)) return;
-  //initialize voice channel
+  
+  //get number of "ARGUMENTS" of message
   var contentleng = message.content.split(" ").length;
+
+  // LINK
   if (message.content.startsWith(`${prefix}link`)) {
     data.textChannel = message.channel;
-    //if message contains a second parameter
+    
+    //if link command has more than one ARGUMENT
     if (contentleng > 1) {
-      var username_ = message.content.split(" ").slice(1).join(" ");
-      //fetch user in guild by username
+      var username_ = message.content.split(" ").slice(1).join(" ");  
       var user_ = null;
-      var userlist = await message.guild.members.fetch({});
+
+      //get guild user list
+      const userlist = await message.guild.members.fetch({});
       for (var uobj of userlist) {
         var u = uobj[1];
+        
+        //if USERS username begins with query, continue
         if (u.displayName.toLowerCase().startsWith(username_.toLowerCase())) {
+          //if a user has already been found with query, send error (ambiguity in who to pick)
           if (user_ != null) {
             data.textChannel.send(ERROR.errorcode_6(username_));
             return;
           }
           user_ = u;
-          break;
         }
       }
+      
+      //if a user has not been found, send error
       if (user_ == null) {
         data.textChannel.send(ERROR.errorcode_2(username_));
       } else {
         var voicechann = user_.voice.channel;
-
         var curusr_voicechann = currentuser.voice.channel;
+
+        //if user is not in voice channel, send error
         if (voicechann == null) {
           data.textChannel.send(ERROR.errorcode_3(u.displayName));
           return;
         }
+        
         if (curusr_voicechann == null) {
           data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
           return;
@@ -125,8 +146,8 @@ client.on("message", async (message) => {
         linkUser(data, u, voicechann);
       }
     } else {
-      //link to user and clear song queue
-      if (currentuser.voice.channel == null) {
+      
+      if (currentuser.voice.channel == null) {//if current user is not in a voice channel
         data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
         return;
       }
@@ -316,6 +337,7 @@ client.on("presenceUpdate", async (presenceEvtArgs) => {
     }
   );
 });
+//#endregion
 
 async function playStream(guildID) {
   if (UTIL.gconfig.deepDebug) console.log("play stream");

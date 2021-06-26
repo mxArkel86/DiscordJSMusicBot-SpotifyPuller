@@ -1,1 +1,1 @@
-node --experimental-worker ./main.js
+node --experimental-worker ./src/main.js
