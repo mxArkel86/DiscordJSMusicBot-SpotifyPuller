@@ -5,6 +5,6 @@
     "opusscript": "^0.0.8",
     "scrape-yt": "^1.4.8",
     "stream-buffers": "^3.0.2",
-    "ytdl-core": "^4.7.0"
+    "ytdl-core": "^4.8.3"
   }
 }

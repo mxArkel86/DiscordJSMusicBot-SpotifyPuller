@@ -6,7 +6,7 @@
     "formats":
     [
         {
-            "prefix":"<prefix placeholder>",
+            "prefix":"!",
             "max_backup_searches": 2,
             "volume": 2,
             "query": "$title by $artist"
@@ -14,7 +14,11 @@
     ],
     "servers": [
         {
-            "id":"<server id placeholder>",
+            "id":"435898723765083845",
+            "format":0
+        },
+	{
+            "id":"699884376648263347",
             "format":0
         }
     ]
