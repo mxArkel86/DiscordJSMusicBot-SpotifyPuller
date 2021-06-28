@@ -186,7 +186,6 @@ client.on("message", async (message) => {
     } else {//basic no argument command (link to self)
       //if current user is not in a voice channe
       if (currentuser.voice.channel == null) {
-        l
         data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
         return;
       }
@@ -271,7 +270,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
     if (type == -1) {
 
       //reset server temporary bot data
-      UTIL.ResetTempData();
+      UTIL.ResetTempData(guildID);
 
       //if there are no users in the voice channel, leave the voice channel as well
       if (oldUserChannel.members.size < 2) oldUserChannel.leave();
