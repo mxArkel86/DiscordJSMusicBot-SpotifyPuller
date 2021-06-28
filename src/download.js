@@ -107,36 +107,37 @@ function downloadData(index, songlist, sData, song, playStream) {
       return;
     }
   }
-
+  var stream = null;
   //begin ytdl download process
   ytdl(url, { filter: "audioonly" })
     .on("data", (chunk) => {
 
       //if this is the first chunk of data
       if (firstchunk == 1) {
-        if (data.stream != null) data.stream.destroy();
-
-        //destroy previous stream object if not null
-        if (data.stream != null)
-          data.stream.destroy();
 
         //initialize new stream object to bot
-        data.stream = new streamBuffers.ReadableStreamBuffer({
+        stream = new streamBuffers.ReadableStreamBuffer({
           frequency: 10, // in milliseconds.
           chunkSize: 2048, // in bytes.
         });
 
+        if (data.activestream == 1) {
+          if (data.stream != null)
+            data.stream.destroy();
+          data.stream = stream;
+        }
+        else {
+          if (data.stream2 != null)
+            data.stream2.destroy();
+          data.stream2 = stream;
+        }
+
         //when progress is made on stream
-        data.stream.on("data", (a) => {
-          //set progress
-          data.songprogress =
-            ((data.stream.maxSize() - data.stream.size()) * video.length) /
-            data.stream.maxSize();
-        });
-        data.stream.on("end", () => {
+        stream.on("end", () => {
           //song finished playing
           data.playing = false;
           data.connection.setSpeaking(false);
+          stream.destroy();
         });
 
         //set first chunk false for next runs
@@ -146,7 +147,7 @@ function downloadData(index, songlist, sData, song, playStream) {
         var delay = Date.now() - song.requesttime;
         var action = 0;
 
-        if (data.songprogress > 95) {//fairly sure song is not played out of order
+        if (data.playing == true) {//fairly sure song is not played out of order
 
           //if the new delay is greater than the previous delay (song took longer to process)
           if (delay >= data.delay) {
@@ -170,7 +171,7 @@ function downloadData(index, songlist, sData, song, playStream) {
         //play stream using new stream object
         setTimeout(playStream, 0, song, sData);
       }
-      data.stream.put(chunk);
+      stream.put(chunk);
     })
     .on("progress", (chunksize, val, total) => {
       //
@@ -180,7 +181,7 @@ function downloadData(index, songlist, sData, song, playStream) {
         if (percent_2 != unique) {
           unique = percent_2;
           console.log(
-            "downloading [" + val + "/" + total + "]  " + percent + "%"
+            "downloading [" + val + "/" + total + "]  " + percent + "%" + "  [" + (data.activestream==1?0:1) + "]"
           ); //show download progress
         }
       }

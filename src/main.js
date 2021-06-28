@@ -196,27 +196,9 @@ client.on("message", async (message) => {
     }
   } else if (message.content == `${prefix}playing`) {
     //convert minutes to seconds, and figure out song progress
-    var song = data.song;
-    var progress = (data.songprogress * 10) / data.songmax;
-    var str = ("#".repeat(progress) + "-".repeat(10 - progress)).toString();
-    var minutes = Math.floor(data.songprogress / 60);
-    var seconds = Math.round(data.songprogress - minutes * 60);
-    var minutes1 = Math.floor(data.songmax / 60);
-    var seconds1 = data.songmax - minutes1 * 60;
-    var str2 =
-      str.substring(0, str.length / 2) +
-      ` ` +
-      minutes +
-      `:` +
-      seconds +
-      ` / ` +
-      minutes1 +
-      `:` +
-      seconds1 +
-      ` ` +
-      str.substring(str.length / 2);
+    let song = data.song;
     message.channel.send(
-      `Started playing: **${song.title} by ${song.artist}**\n[` + str2 + `]`
+      `Playing: **${song.title} by ${song.artist}**`
     );
   } else if (message.content == `${prefix}unlink`) {
 
@@ -363,7 +345,7 @@ client.on("presenceUpdate", async (presenceEvtArgs) => {
       songlist.sort((a, b) => (a.timedeviation > b.timedeviation) ? 1 : -1)
 
       //remove current song from queue
-      data.songqueue.splice(data.songqueue.findIndex((a) => (a.r == song.r)));
+      data.songqueue.splice(data.songqueue.findIndex((a) => (a.r == song.r)), 1);
 
       //sort the songlist by request time
       data.songqueue.sort((a, b) => (a.requesttime < b.requesttime) ? 1 : -1)
@@ -391,8 +373,22 @@ async function playStream(song, sData) {
   let data = sData[0];
   let settings = sData[1];
 
+  var stream;
+  if(data.activestream==0)
+  {
+    stream = data.stream2;
+    if(data.stream!=null)
+    data.stream.destroy();
+    data.activestream = 1;
+  }else{
+    stream = data.stream;
+    if(data.stream2!=null)
+    data.stream2.destroy();
+    data.activestream = 0;
+  }
+
   //begin playing song on new stream
-  var dispatcher = data.connection.play(data.stream);
+  var dispatcher = data.connection.play(stream);
   dispatcher.on("start", () => {
     //data.textChannel.send(`Started playing: **${song.title} by ${song.artist}**`);
     console.log(`Playing: ${song.title} by ${song.artist}`);

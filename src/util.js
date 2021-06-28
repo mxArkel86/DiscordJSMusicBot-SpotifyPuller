@@ -17,8 +17,9 @@ const guildDataDef = {
     songqueue: [],
     delay: 0, //song delay (backend stuff)
     stream: null, //song stream
-    song: null, //song being played
-    songprogress: 0 //progress through the current song,
+    stream2: null,
+    activestream: 1,
+    song: null //song being played
 };
 
 
