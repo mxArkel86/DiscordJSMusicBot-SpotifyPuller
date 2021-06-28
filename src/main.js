@@ -416,11 +416,6 @@ async function playStream(song, sData) {
   ConfigOverride.json overrides config.json in priority
 */
 
-if (fs.existsSync("configs/configOverride.json")) {
-  console.log("reading override config");
-  UTIL.importSettings("configs/configOverride.json", init);
-} else {
-  console.log("reading default config");
-  UTIL.importSettings("configs/config.json", init);
-}
+UTIL.importSettings("configs/config.json", init);
+
 console.log("loaded config");
