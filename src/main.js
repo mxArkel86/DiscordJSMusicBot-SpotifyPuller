@@ -33,8 +33,8 @@ client.on("error", (e) => {
 });
 
 client.on("debug", (e) => {
-  if (UTIL.gconfig.deepDebug)
-  console.log(e);
+  //if (UTIL.gconfig.deepDebug)
+    //console.log(e);
 });
 //#endregion
 
@@ -55,14 +55,30 @@ async function linkUser(data, user, voicechannel) {
   data.songs = [];
   //initialize connection
   data.connection = await voicechannel.join();
+  data.connection.setSpeaking(0);
   data.voiceChannel = voicechannel;
-  data.textChannel.send(
-    "Spotify of **" +
+
+}
+
+async function notify(sData, user, voicechannel, exclaim = false) {
+  let data = sData[0];
+  if (!exclaim) {
+    data.textChannel.send(
+      "Spotify of **" +
       user.displayName +
       "** linked to **" +
       voicechannel.name +
       "**"
-  );
+    );
+  } else {
+    data.textChannel.send(
+      "Spotify of **" +
+      user.toString() +
+      "** linked to **" +
+      voicechannel.name +
+      "**"
+    );
+  }
 }
 
 //#region ADVANCED EVENTHANDLERS
@@ -71,7 +87,7 @@ client.on("message", async (message) => {
   //get basic message and server info
   var currentuser = message.guild.member(message.author.id);
   const guildID = message.guild.id;
-  
+
   //if the message author is a bot, skip everything
   if (message.author.bot) return;
 
@@ -93,24 +109,32 @@ client.on("message", async (message) => {
 
   //check if message is a command
   if (!message.content.startsWith(prefix)) return;
-  
-  //get number of "ARGUMENTS" of message
-  var contentleng = message.content.split(" ").length;
 
-  // LINK
+  //get number of "ARGUMENTS" of message
+  var arguments = message.content.split(" ").slice(1)
+  var contentleng = arguments.length - 1;
+
+  // LINK command
   if (message.content.startsWith(`${prefix}link`)) {
     data.textChannel = message.channel;
-    
+
     //if link command has more than one ARGUMENT
-    if (contentleng > 1) {
-      var username_ = message.content.split(" ").slice(1).join(" ");  
+    if (contentleng > 0) {
+      var username_ = "";
+      var extUser = false;
+      if (arguments[0] == "here") {
+        username_ = arguments.slice(1).join(" ");
+        extUser = true;
+      }
+      else
+        username_ = arguments.join(" ");
       var user_ = null;
 
       //get guild user list
       const userlist = await message.guild.members.fetch({});
       for (var uobj of userlist) {
         var u = uobj[1];
-        
+
         //if USERS username begins with query, continue
         if (u.displayName.toLowerCase().startsWith(username_.toLowerCase())) {
           //if a user has already been found with query, send error (ambiguity in who to pick)
@@ -121,7 +145,7 @@ client.on("message", async (message) => {
           user_ = u;
         }
       }
-      
+
       //if a user has not been found, send error
       if (user_ == null) {
         data.textChannel.send(ERROR.errorcode_2(username_));
@@ -129,35 +153,50 @@ client.on("message", async (message) => {
         var voicechann = user_.voice.channel;
         var curusr_voicechann = currentuser.voice.channel;
 
-        //if user is not in voice channel, send error
+        //if queried user is not in voice channel, send error
         if (voicechann == null) {
           data.textChannel.send(ERROR.errorcode_3(u.displayName));
           return;
         }
-        
+
+        //if user sending request is not in a voice channel, send error
         if (curusr_voicechann == null) {
           data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
           return;
         }
-        if (curusr_voicechann.id != voicechann.id) {
+
+        //if the:
+        // - sending user's channel is not the same as the queried user's channel
+        // - command did not include 'here' mention
+        // send error
+
+        if (curusr_voicechann.id != voicechann.id && !extUser) {
           data.textChannel.send(ERROR.errorcode_7());
           return;
         }
-        linkUser(data, u, voicechann);
+        //link queried user
+        linkUser(data, user_, voicechann);
+
+        if (extUser) {
+          notify(sData, user_, voicechann, true);
+        } else {
+          notify(sData, user_, voicechann);
+        }
       }
-    } else {
-      
-      if (currentuser.voice.channel == null) {//if current user is not in a voice channel
+    } else {//basic no argument command (link to self)
+      //if current user is not in a voice channe
+      if (currentuser.voice.channel == null) {
+        l
         data.textChannel.send(ERROR.errorcode_4(currentuser.displayName));
         return;
       }
+
+      //notify and link
       linkUser(data, currentuser, currentuser.voice.channel);
+      notify(sData, currentuser, currentuser.voice.channel);
     }
   } else if (message.content == `${prefix}playing`) {
-    if (currentuser.voice.channel.id != data.voiceChannel.id) {
-      message.channel.send(ERROR.errorcode_5(currentuser.displayName));
-      return;
-    }
+    //convert minutes to seconds, and figure out song progress
     var song = data.song;
     var progress = (data.songprogress * 10) / data.songmax;
     var str = ("#".repeat(progress) + "-".repeat(10 - progress)).toString();
@@ -181,24 +220,33 @@ client.on("message", async (message) => {
       `Started playing: **${song.title} by ${song.artist}**\n[` + str2 + `]`
     );
   } else if (message.content == `${prefix}unlink`) {
-    if(!currentuser.voice.channel){
+
+    //if current user is not in a voice channel
+    if (!currentuser.voice.channel) {
       message.channel.send(ERROR.errorcode_4(currentuser.displayName));
       return;
     }
+
+    //if current user's voice channel is not the same as the linked one
     if (currentuser.voice.channel.id != data.voiceChannel.id) {
       message.channel.send(ERROR.errorcode_5(currentuser.displayName));
       return;
     }
+
+    //unlink bot
     client.voice.connections.get(guildID).disconnect();
     data = guildDataDef;
     message.channel.send("Bot disconnected from voice channel");
-  } else if (message.content == `${prefix}help`) {
+
+  } else if (message.content == `${prefix}help`) {//HELP commands
     UTIL.writeHelpCommands(message.channel);
   } else {
+    //command not recognized
     message.channel.send("You need to enter a valid command!");
   }
 });
 
+//when a user's voice state changes (joins/leaves channel)
 client.on("voiceStateUpdate", async (oldMember, newMember) => {
   if (UTIL.gconfig.deepDebug) console.log("voice state updated");
   let oldUserChannel = oldMember.channel;
@@ -209,162 +257,157 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
   if (sData == null) return;
   let data = sData[0];
 
-  var userid = newMember.member.id;
+  //frame join and leave events in simpler terms
   var type = 0;
   if (newUserChannel === null)
-    //user left
     type = -1;
   else if (oldUserChannel === null)
-    //user joined
     type = 1;
 
-  if (userid == data.userID) {
-    if (type == -1) {
-      //user left the channel
-      data.userID = null; //disconnect user link
+  //if the context user is the same as the linked user
+  if (newMember.member.id == data.userID) {
 
-      //if users in channel is 1
+    //and the context user left a channel
+    if (type == -1) {
+
+      //reset server temporary bot data
+      UTIL.ResetTempData();
+
+      //if there are no users in the voice channel, leave the voice channel as well
       if (oldUserChannel.members.size < 2) oldUserChannel.leave();
     }
   }
 });
 
-
+//when the user's activities change (every time spotify changes songs)
 client.on("presenceUpdate", async (presenceEvtArgs) => {
   if (UTIL.gconfig.deepDebug) console.log("presence updated");
-  var dNow = Date.now();
+
+  //return if presence is null (user is not doing anything)
   if (presenceEvtArgs === undefined) return;
   const guildID = presenceEvtArgs.guild.id;
 
+  //get usual data package
   let sData = UTIL.GetData(guildID);
   if (sData == null) return;
-
   let data = sData[0];
   let settings = sData[1];
+
+  //if the context user is the same as the linked user, then continue on
   var userid = presenceEvtArgs.userID;
   if (data.userID != userid)
-    //user matches
     return;
 
-  var activities = presenceEvtArgs.user.presence.activities; //get user activities
+  //get user activities  
+  var activities = presenceEvtArgs.user.presence.activities;
+
+  //look through activities for spotify
   var found = false;
   var activity = null;
   for (a of activities) {
     var name = a.name;
     if (name != "Spotify")
-      //if one of the activities is spotify
       continue;
     found = true;
     activity = a;
     break;
   }
   if (!found) return;
-  //spotify is an activity of the user
+
+  //spotify is in fact an activity of the user
   let songname = activity.details;
   let artist = activity.state;
   let timestamps = activity.timestamps;
-  //check if song is already playing
-  if (data.songqueue.find((s) => s.title == songname) != null) return;
-
-  var r;
-  while ((r = Math.round(Math.random() * 999)) == data.songhandler) {}
-  data.songhandler = r;
-  const song = {
-    title: songname,
-    artist: artist,
-    id: r,
-    length: 0,
-  };
-  //add song to queue
-  data.songqueue.push(song);
   var tStart = Date.parse(timestamps.start);
   var tEnd = Date.parse(timestamps.end);
   var songlength = (tEnd - tStart) / 1000;
-  //var songoffset = (tStart - dNow) / 1000;
+  //get time of request
+  var requeststart = activity.createdTimestamp;
+
+  //stop if song is alread in queue to be played
+  if (data.songqueue.find((s) => s.title == songname) != undefined) return;
+
+  //generate a unique song id
+  var r = -1;
+  while (true) {
+    r = Math.round(Math.random() * 999);
+
+    for (var song1 of data.songqueue) {
+      if (song1.id == r) {
+        r = -1;
+        break;
+      }
+    }
+    if (song1 != -1)
+      break;
+  }
+  var song = {
+    title: songname,
+    artist: artist,
+    id: r,
+    songlength: songlength,
+    requesttime: requeststart
+  };
+  //push song to queue
+  data.songqueue.push(song);
 
   if (UTIL.gconfig.deepDebug)
     console.log("user presence updated - [" + songname + "] - " + r);
 
-    DWNLD.searchPage(
-    0,
-    guildID,
-    songname,
-    artist,
-    songlength,
-    r,
-    function successful(mainsonglist, backupsonglist, r) {
-      if (r != data.songhandler) {
-        //song to be played switched during processing
-        data.songqueue.shift();
-        return 1;
-      }
-      if (UTIL.gconfig.deepDebug) {
-        console.log(backupsonglist.length + " unmatched songs found");
-        console.log(mainsonglist.length + "close matches");
-      }
-      if (mainsonglist.length > 0) {
-        if (UTIL.gconfig.deepDebug)
-          mainsonglist.sort((a, b) =>
-            a.lengthdeviation > b.lengthdeviation ? 1 : -1
-          ); //sort list starting with lowest deviation to highest
-      }
+  DWNLD.searchPage(0, sData, song,
 
-      backupsonglist.sort((a, b) =>
-        a.lengthdeviation > b.lengthdeviation ? 1 : -1
-      );
+    //video search was successful
+    function successful(song, songlist) {
+      if (UTIL.gconfig.deepDebug) console.log(songlist.length + " songs found");
 
-      DWNLD.downloadData(
-        () => {
-          DWNLD.downloadData(
-            () => {
-              console.log("no song able to be played"); //no music found
-            },
-            guildID,
-            r,
-            backupsonglist,
-            0,
-            dNow,
-            playStream
-          );
-        },
-        guildID,
-        r,
-        mainsonglist,
-        0,
-        dNow,
-        playStream
-      );
+      //sort songs based on variation to activity song length
+      songlist.sort((a, b) => (a.timedeviation > b.timedeviation) ? 1 : -1)
+
+      //remove current song from queue
+      data.songqueue.splice(data.songqueue.findIndex((a) => (a.r == song.r)));
+
+      //sort the songlist by request time
+      data.songqueue.sort((a, b) => (a.requesttime < b.requesttime) ? 1 : -1)
+
+      //if the first song in the list (latest called) is not this one, then skip
+      if (data.length > 0 && data[0].r != song.r) {
+        return;
+      }
+      if (data.song != null && song.requesttime < data.song.requesttime) {//if song requested had a request time that is earlier 
+        return;                                  // than the currently playing song (delayed processing)
+      }
+      data.song = song;//make queried song the current song for the player
+      DWNLD.downloadData(0, songlist, sData, song, playStream);
+    },
+    function failed(code) {
+
     }
   );
 });
 //#endregion
 
-async function playStream(guildID) {
+async function playStream(song, sData) {
   if (UTIL.gconfig.deepDebug) console.log("play stream");
-  let sData = UTIL.GetData(guildID);
-  if (sData == null) return;
 
   let data = sData[0];
   let settings = sData[1];
 
-  var song = data.songqueue.shift();
-
-  if (song == undefined) return;
-
+  //begin playing song on new stream
   var dispatcher = data.connection.play(data.stream);
   dispatcher.on("start", () => {
     //data.textChannel.send(`Started playing: **${song.title} by ${song.artist}**`);
     console.log(`Playing: ${song.title} by ${song.artist}`);
-    data.song = song;
     data.playing = true;
+    data.connection.setSpeaking(1);
   });
   dispatcher.on("error", (e) => {
     console.log("error=" + e);
   });
   dispatcher.on("end", (e) => {
     data.song = null;
+    data.connection.setSpeaking(0);
   });
-  dispatcher.setVolume(settings.volume);
+  dispatcher.setVolume(settings.volume*0.5);
   data.dispatcher = dispatcher;
 }
 
@@ -372,11 +415,12 @@ async function playStream(guildID) {
   Reading the json config files and then initializing the bot with it.
   ConfigOverride.json overrides config.json in priority
 */
-if (fs.existsSync("../configs/configOverride.json")) {
+
+if (fs.existsSync("configs/configOverride.json")) {
   console.log("reading override config");
-  UTIL.importSettings("../configs/configOverride.json", init);
+  UTIL.importSettings("configs/configOverride.json", init);
 } else {
   console.log("reading default config");
-  UTIL.importSettings("../configs/config.json", init);
+  UTIL.importSettings("configs/config.json", init);
 }
 console.log("loaded config");

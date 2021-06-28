@@ -1,0 +1,21 @@
+{
+    "token":"<server token placeholder>",
+    "downloadUpdateInterval":5,
+    "deepDebug": false,
+    "formats":
+    {
+        "default":{
+            "prefix":"<server prefix placeholder>",
+            "max_page_search": 2,
+            "max_song_store":8,
+            "volume": 2,
+            "query": "$title by $artist"
+        }
+    },
+    "servers": [
+        {
+            "id":"<server id placeholder>",
+            "format":"default"
+        }
+    ]
+}

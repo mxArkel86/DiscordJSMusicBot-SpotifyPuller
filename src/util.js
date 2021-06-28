@@ -4,7 +4,6 @@ const serverData = new Map();
 var gconfig = {
     token: null,
     downloadUpdateInterval: null,
-    songmaxdeviation: null,
     deepDebug: null
 };
 
@@ -13,15 +12,13 @@ const guildDataDef = {
     voiceChannel: null, //voice channel where bot is in
     connection: null, //backend connection util
     dispatcher: null, //bot audio manager
-    songqueue: [], //song queue per server
     userID: null, //id of user that is linked
     playing: false, //is song playing
+    songqueue: [],
     delay: 0, //song delay (backend stuff)
-    songhandler: -1, //id of the song being played
     stream: null, //song stream
-    song: null, //song being played info
-    songprogress: 0, //progress through the current song,
-    songmax: 0, //song length
+    song: null, //song being played
+    songprogress: 0 //progress through the current song,
 };
 
 
@@ -33,6 +30,10 @@ function GetData(key) {
         return null;
     } else
         return data;
+}
+
+function ResetTempData(key){
+    serverData[key][0] = guildDataDef;
 }
 
 function importSettings(file, callback) {
@@ -65,5 +66,5 @@ function writeHelpCommands(channel) {
 
 
 module.exports = {
-    importSettings, writeHelpCommands, GetData, gconfig
+    importSettings, writeHelpCommands, GetData, ResetTempData, gconfig
 }
