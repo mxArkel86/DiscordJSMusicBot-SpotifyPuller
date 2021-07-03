@@ -107,47 +107,31 @@ function downloadData(index, songlist, sData, song, playStream) {
       return;
     }
   }
-  var stream = null;
+  var stream = new streamBuffers.ReadableStreamBuffer({
+          frequency: 10, // in milliseconds.
+          chunkSize: 2048, // in bytes.
+  });
+  stream.on("end", () => {
+    //song finished playing
+    data.playing = false;
+    data.connection.setSpeaking(false);
+  });
   //begin ytdl download process
+  var action = 0;
   ytdl(url, { filter: "audioonly" })
     .on("data", (chunk) => {
 
       //if this is the first chunk of data
       if (firstchunk == 1) {
 
-        //initialize new stream object to bot
-        stream = new streamBuffers.ReadableStreamBuffer({
-          frequency: 10, // in milliseconds.
-          chunkSize: 2048, // in bytes.
-        });
-
-        if (data.activestream == 1) {
-          if (data.stream != null)
-            data.stream.destroy();
-          data.stream = stream;
-        }
-        else {
-          if (data.stream2 != null)
-            data.stream2.destroy();
-          data.stream2 = stream;
-        }
-
-        //when progress is made on stream
-        stream.on("end", () => {
-          //song finished playing
-          data.playing = false;
-          data.connection.setSpeaking(false);
-          stream.destroy();
-        });
-
         //set first chunk false for next runs
         firstchunk = 0;
 
         //calculate delays
         var delay = Date.now() - song.requesttime;
-        var action = 0;
+        
 
-        if (data.playing == true) {//fairly sure song is not played out of order
+        if (data.playing == false) {//fairly sure song is not played out of order
 
           //if the new delay is greater than the previous delay (song took longer to process)
           if (delay >= data.delay) {
@@ -165,11 +149,14 @@ function downloadData(index, songlist, sData, song, playStream) {
           }
         }
 
+        //when progress is made on stream
+        
+
         if (UTIL.gconfig.deepDebug) {
           console.log("song play delay=" + delay + " [" + action + "]");
         }
         //play stream using new stream object
-        setTimeout(playStream, 0, song, sData);
+        playStream(song, stream, sData, action);
       }
       stream.put(chunk);
     })

@@ -111,15 +111,14 @@ client.on("message", async (message) => {
   if (!message.content.startsWith(prefix)) return;
 
   //get number of "ARGUMENTS" of message
-  var arguments = message.content.split(" ").slice(1)
-  var contentleng = arguments.length - 1;
+  var arguments = message.content.trim().split(" ").slice(1)
 
   // LINK command
   if (message.content.startsWith(`${prefix}link`)) {
     data.textChannel = message.channel;
 
     //if link command has more than one ARGUMENT
-    if (contentleng > 0) {
+    if (arguments.length > 0) {
       var username_ = "";
       var extUser = false;
       if (arguments[0] == "here") {
@@ -135,6 +134,8 @@ client.on("message", async (message) => {
       for (var uobj of userlist) {
         var u = uobj[1];
 
+        if(u.user.bot)
+        continue;
         //if USERS username begins with query, continue
         if (u.displayName.toLowerCase().startsWith(username_.toLowerCase())) {
           //if a user has already been found with query, send error (ambiguity in who to pick)
@@ -143,6 +144,7 @@ client.on("message", async (message) => {
             return;
           }
           user_ = u;
+          continue;
         }
       }
 
@@ -154,7 +156,7 @@ client.on("message", async (message) => {
         var curusr_voicechann = currentuser.voice.channel;
 
         //if queried user is not in voice channel, send error
-        if (voicechann == null) {
+        if (!extUser && voicechann == null) {
           data.textChannel.send(ERROR.errorcode_3(u.displayName));
           return;
         }
@@ -170,17 +172,17 @@ client.on("message", async (message) => {
         // - command did not include 'here' mention
         // send error
 
-        if (curusr_voicechann.id != voicechann.id && !extUser) {
+        if (!extUser && curusr_voicechann.id != voicechann.id) {
           data.textChannel.send(ERROR.errorcode_7());
           return;
         }
         //link queried user
-        linkUser(data, user_, voicechann);
+        linkUser(data, user_, curusr_voicechann);
 
         if (extUser) {
-          notify(sData, user_, voicechann, true);
+          notify(sData, user_, curusr_voicechann, true);
         } else {
-          notify(sData, user_, voicechann);
+          notify(sData, user_, curusr_voicechann);
         }
       }
     } else {//basic no argument command (link to self)
@@ -198,7 +200,7 @@ client.on("message", async (message) => {
     //convert minutes to seconds, and figure out song progress
     let song = data.song;
     message.channel.send(
-      `Playing: **${song.title} by ${song.artist}**`
+      `Playing: **${song.title}** by **${song.artist}**`
     );
   } else if (message.content == `${prefix}unlink`) {
 
@@ -367,26 +369,11 @@ client.on("presenceUpdate", async (presenceEvtArgs) => {
 });
 //#endregion
 
-async function playStream(song, sData) {
+async function playStream(song,stream, sData, action) {
   if (UTIL.gconfig.deepDebug) console.log("play stream");
 
   let data = sData[0];
   let settings = sData[1];
-
-  var stream;
-  if(data.activestream==0)
-  {
-    stream = data.stream2;
-    if(data.stream!=null)
-    data.stream.destroy();
-    data.activestream = 1;
-  }else{
-    stream = data.stream;
-    if(data.stream2!=null)
-    data.stream2.destroy();
-    data.activestream = 0;
-  }
-
   //begin playing song on new stream
   var dispatcher = data.connection.play(stream);
   dispatcher.on("start", () => {
@@ -401,6 +388,7 @@ async function playStream(song, sData) {
   dispatcher.on("end", (e) => {
     data.song = null;
     data.connection.setSpeaking(0);
+    stream.destroy();
   });
   dispatcher.setVolume(settings.volume*0.5);
   data.dispatcher = dispatcher;
