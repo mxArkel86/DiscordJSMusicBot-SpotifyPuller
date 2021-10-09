@@ -1,12 +1,10 @@
 {
   "dependencies": {
-    "@discordjs/opus": "^0.6.0",
-    "discord.js": "^13.2.0",
-    "nth-check": "^2.0.1",
+    "@discordjs/opus": "^0.5.0",
+    "discord.js": "^12.5.3",
     "opusscript": "^0.0.8",
     "scrape-yt": "^1.4.8",
     "stream-buffers": "^3.0.2",
-    "tar": "^6.1.11",
-    "ytdl-core": "^4.9.1"
+    "ytdl-core": "^4.8.3"
   }
 }
