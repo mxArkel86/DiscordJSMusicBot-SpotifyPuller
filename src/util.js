@@ -1,4 +1,5 @@
 const fs = require("fs");
+const ERROR = require("./errorcodes.js");
 
 const serverData = new Map();
 var gconfig = {
